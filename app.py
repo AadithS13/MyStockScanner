@@ -66,14 +66,14 @@ with tab1:
             top10 = week_chg.nlargest(10).reset_index()
             top10.columns = ["Symbol", "Week (%)"]
             top10["Week (%)"] = top10["Week (%)"].round(2)
-            st.dataframe(top10, use_container_width=True, hide_index=True)
+            st.dataframe(top10, width="stretch", hide_index=True)
 
         with col_l:
             st.markdown("#### 🔴 Top 10 Losers this Week")
             bot10 = week_chg.nsmallest(10).reset_index()
             bot10.columns = ["Symbol", "Week (%)"]
             bot10["Week (%)"] = bot10["Week (%)"].round(2)
-            st.dataframe(bot10, use_container_width=True, hide_index=True)
+            st.dataframe(bot10, width="stretch", hide_index=True)
 
 # ── Tab 2: Swing Signals ───────────────────────────────────────────────────────
 with tab2:
@@ -126,7 +126,7 @@ with tab2:
         .map(_color_macd, subset=["MACD"])
         .map(_color_num, subset=["vs 20DMA (%)", "vs 50DMA (%)", "Upside (%)"])
     )
-    st.dataframe(styled, use_container_width=True, hide_index=True, height=520)
+    st.dataframe(styled, width="stretch", hide_index=True, height=520)
     st.caption(
         f"Showing {len(filtered)} of {len(signals_df)} Nifty 500 stocks  ·  "
         "Target = next resistance level  ·  Timeline = estimated based on momentum  ·  Not financial advice"
@@ -231,7 +231,7 @@ with tab3:
         fig.update_yaxes(title_text="Price (₹)", row=1, col=1)
         fig.update_yaxes(title_text="RSI", row=2, col=1, range=[0, 100])
 
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
 # ── Tab 4: Portfolio ───────────────────────────────────────────────────────────
 with tab4:
@@ -297,4 +297,4 @@ TRENT, 5, 2755.30
                     return ""
 
             styled_pf = pf.style.map(_pnl_color, subset=["P&L (₹)", "P&L (%)"])
-            st.dataframe(styled_pf, use_container_width=True, hide_index=True)
+            st.dataframe(styled_pf, width="stretch", hide_index=True)

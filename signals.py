@@ -1,5 +1,13 @@
 import pandas as pd
 import numpy as np
+from datetime import datetime, timedelta
+
+
+def _timeline_dates(weeks_min: int, weeks_max: int) -> str:
+    today = datetime.today()
+    start = today + timedelta(weeks=weeks_min)
+    end = today + timedelta(weeks=weeks_max)
+    return f"{start.strftime('%-d %b')} – {end.strftime('%-d %b')}"
 
 
 def compute_rsi(prices: pd.Series, period: int = 14) -> float:
@@ -47,9 +55,9 @@ def generate_signals(closes: pd.DataFrame, volumes: pd.DataFrame, nifty500: set)
 
         # ── Indicators ──────────────────────────────────────────────────────
         rsi = compute_rsi(prices)
-        ma20 = prices.tail(20).mean()
-        ma50 = prices.tail(50).mean() if len(prices) >= 50 else float("nan")
-        vs_ma20 = (current - ma20) / ma20 * 100
+        ma20 = prices.rolling(20, min_periods=15).mean().iloc[-1]
+        ma50 = prices.rolling(50, min_periods=40).mean().iloc[-1]
+        vs_ma20 = (current - ma20) / ma20 * 100 if not pd.isna(ma20) else float("nan")
         vs_ma50 = (current - ma50) / ma50 * 100 if not pd.isna(ma50) else float("nan")
 
         week_pct = (
@@ -163,11 +171,11 @@ def generate_signals(closes: pd.DataFrame, volumes: pd.DataFrame, nifty500: set)
         rr_ratio = upside_pct / risk_pct if risk_pct > 0 else 0
 
         if score >= 70 and not pd.isna(week_pct) and week_pct > 3:
-            timeline = "1–2 weeks"
+            timeline = _timeline_dates(1, 2)
         elif score >= 55:
-            timeline = "2–3 weeks"
+            timeline = _timeline_dates(2, 3)
         elif score >= 40:
-            timeline = "3–4 weeks"
+            timeline = _timeline_dates(3, 4)
         else:
             timeline = "–"
 
@@ -176,7 +184,7 @@ def generate_signals(closes: pd.DataFrame, volumes: pd.DataFrame, nifty500: set)
             "Price (₹)": round(current, 2),
             "RSI": round(rsi, 1) if not pd.isna(rsi) else "–",
             "MACD": "Bullish" if macd_bullish else "Bearish",
-            "vs 20DMA (%)": round(vs_ma20, 2),
+            "vs 20DMA (%)": round(vs_ma20, 2) if not pd.isna(vs_ma20) else "–",
             "vs 50DMA (%)": round(vs_ma50, 2) if not pd.isna(vs_ma50) else "–",
             "Vol Ratio": round(vol_ratio, 2),
             "Signal": signal,

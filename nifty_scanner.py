@@ -1,8 +1,6 @@
 import os
 import sys
-import time
 import requests
-import yfinance as yf
 import pandas as pd
 from datetime import datetime, timedelta
 from io import StringIO
@@ -13,101 +11,105 @@ FROM_EMAIL = "onboarding@resend.dev"
 
 NSE_CSV_PRIMARY = "https://archives.nseindia.com/content/indices/ind_nifty500list.csv"
 NSE_CSV_FALLBACK = "https://raw.githubusercontent.com/kprohith/nse-stock-analysis/master/ind_nifty500list.csv"
+BHAVCOPY_URL = "https://archives.nseindia.com/products/content/sec_bhavdata_full_{date}.csv"
+
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Referer": "https://www.nseindia.com/",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+}
 
 
-def get_nifty500_symbols():
+def get_nifty500_symbols() -> set[str]:
     for url in [NSE_CSV_PRIMARY, NSE_CSV_FALLBACK]:
         try:
-            resp = requests.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
+            resp = requests.get(url, timeout=15, headers=HEADERS)
             resp.raise_for_status()
             df = pd.read_csv(StringIO(resp.text))
-            symbols = df["Symbol"].dropna().tolist()
+            symbols = set(df["Symbol"].dropna().str.strip())
             print(f"Fetched {len(symbols)} symbols from {url}")
             return symbols
         except Exception as e:
-            print(f"Failed to fetch from {url}: {e}")
-    raise RuntimeError("Could not fetch Nifty 500 symbol list from any source")
+            print(f"Failed {url}: {e}")
+    raise RuntimeError("Could not fetch Nifty 500 symbol list")
 
 
-def last_friday(ref: datetime) -> datetime:
-    days_back = (ref.weekday() - 4) % 7
-    if days_back == 0:
-        days_back = 7
-    return ref - timedelta(days=days_back)
+def fetch_bhavcopy(date: datetime) -> pd.DataFrame | None:
+    """Download bhavcopy for a given date. Returns None if market was closed."""
+    url = BHAVCOPY_URL.format(date=date.strftime("%d%m%Y"))
+    try:
+        resp = requests.get(url, timeout=20, headers=HEADERS)
+        if resp.status_code == 404:
+            return None
+        resp.raise_for_status()
+        df = pd.read_csv(StringIO(resp.text))
+        df.columns = df.columns.str.strip()
+        df["SYMBOL"] = df["SYMBOL"].str.strip()
+        eq = df[df["SERIES"].str.strip() == "EQ"][["SYMBOL", "CLOSE_PRICE"]].copy()
+        eq["CLOSE_PRICE"] = pd.to_numeric(eq["CLOSE_PRICE"], errors="coerce")
+        print(f"Bhavcopy {date.strftime('%d-%b-%Y')}: {len(eq)} EQ records")
+        return eq
+    except Exception as e:
+        print(f"Bhavcopy fetch failed for {date.strftime('%d-%m-%Y')}: {e}")
+        return None
 
 
-def get_friday_closes(symbols: list[str]) -> dict[str, tuple[float, float]]:
+def last_trading_day(before: datetime, target_weekday: int = 4) -> tuple[datetime, pd.DataFrame]:
+    """Walk back from `before` to find the most recent `target_weekday` (4=Friday) with a valid bhavcopy."""
+    candidate = before - timedelta(days=1)
+    while True:
+        if candidate.weekday() == target_weekday:
+            df = fetch_bhavcopy(candidate)
+            if df is not None:
+                return candidate, df
+        candidate -= timedelta(days=1)
+        if (before - candidate).days > 30:
+            raise RuntimeError("Could not find a valid trading Friday in the last 30 days")
+
+
+def main():
     today = datetime.today()
-    fri1 = last_friday(today)
-    fri2 = last_friday(fri1 - timedelta(days=1))
-    print(f"Last Friday: {fri1.date()}, Prior Friday: {fri2.date()}")
 
-    start = (fri2 - timedelta(days=3)).strftime("%Y-%m-%d")
-    end = (fri1 + timedelta(days=2)).strftime("%Y-%m-%d")
+    nifty500 = get_nifty500_symbols()
 
-    closes: dict[str, tuple[float, float]] = {}
-    batch_size = 20
+    print("Finding last trading Friday...")
+    fri1_date, bhavcopy1 = last_trading_day(today, target_weekday=4)
 
-    for i in range(0, len(symbols), batch_size):
-        batch = symbols[i : i + batch_size]
-        tickers = [s + ".NS" for s in batch]
-        batch_num = i // batch_size + 1
-        total_batches = (len(symbols) + batch_size - 1) // batch_size
+    print("Finding prior trading Friday...")
+    fri2_date, bhavcopy2 = last_trading_day(fri1_date, target_weekday=4)
 
-        for attempt in range(3):
-            try:
-                raw = yf.download(
-                    tickers,
-                    start=start,
-                    end=end,
-                    auto_adjust=True,
-                    progress=False,
-                    threads=False,
-                )
-                close = raw["Close"] if "Close" in raw.columns else raw
-                for sym, ticker in zip(batch, tickers):
-                    try:
-                        series = close[ticker].dropna()
-                        fri1_close = series.loc[series.index.normalize() <= pd.Timestamp(fri1.date())].iloc[-1]
-                        fri2_close = series.loc[series.index.normalize() <= pd.Timestamp(fri2.date())].iloc[-1]
-                        closes[sym] = (float(fri2_close), float(fri1_close))
-                    except Exception:
-                        pass
-                print(f"Batch {batch_num}/{total_batches} done ({len(closes)} total so far)")
-                break
-            except Exception as e:
-                wait = 10 * (attempt + 1)
-                print(f"Batch {batch_num} attempt {attempt+1} failed: {e} — retrying in {wait}s")
-                time.sleep(wait)
+    print(f"Comparing {fri2_date.strftime('%d %b %Y')} → {fri1_date.strftime('%d %b %Y')}")
 
-        time.sleep(3)
+    merged = bhavcopy1.merge(bhavcopy2, on="SYMBOL", suffixes=("_last", "_prev"))
+    merged = merged[merged["SYMBOL"].isin(nifty500)]
+    merged = merged[(merged["CLOSE_PRICE_prev"] > 0) & (merged["CLOSE_PRICE_last"] > 0)]
+    merged["pct_gain"] = (merged["CLOSE_PRICE_last"] - merged["CLOSE_PRICE_prev"]) / merged["CLOSE_PRICE_prev"] * 100
 
-    print(f"Successfully fetched closes for {len(closes)}/{len(symbols)} symbols")
-    return closes
+    top10 = merged.nlargest(10, "pct_gain").reset_index(drop=True)
+    print(f"Top 10 computed from {len(merged)} matched Nifty 500 stocks")
+
+    if top10.empty:
+        print("No data — aborting")
+        sys.exit(1)
+
+    subject = f"Nifty 500 Top 10 Gainers — Week of {fri1_date.strftime('%d %b %Y')}"
+    html = build_html(top10, fri1_date, fri2_date)
+    send_email(subject, html)
+    print("Done.")
 
 
-def rank_top10(closes: dict[str, tuple[float, float]]) -> list[dict]:
-    rows = []
-    for sym, (prev, last) in closes.items():
-        if prev > 0:
-            pct = (last - prev) / prev * 100
-            rows.append({"symbol": sym, "prev_close": prev, "last_close": last, "pct_gain": pct})
-    rows.sort(key=lambda r: r["pct_gain"], reverse=True)
-    return rows[:10]
-
-
-def build_html(top10: list[dict], fri1: datetime, fri2: datetime) -> str:
+def build_html(top10: pd.DataFrame, fri1: datetime, fri2: datetime) -> str:
     rows_html = ""
-    for rank, r in enumerate(top10, 1):
-        color = "#16a34a" if r["pct_gain"] >= 0 else "#dc2626"
-        arrow = "▲" if r["pct_gain"] >= 0 else "▼"
+    for rank, row in enumerate(top10.itertuples(), 1):
+        color = "#16a34a" if row.pct_gain >= 0 else "#dc2626"
+        arrow = "▲" if row.pct_gain >= 0 else "▼"
         rows_html += f"""
         <tr style="border-bottom:1px solid #e5e7eb;">
           <td style="padding:12px 16px;text-align:center;font-weight:600;color:#6b7280;">{rank}</td>
-          <td style="padding:12px 16px;font-weight:700;letter-spacing:0.5px;">{r['symbol']}</td>
-          <td style="padding:12px 16px;text-align:right;color:#374151;">₹{r['prev_close']:,.2f}</td>
-          <td style="padding:12px 16px;text-align:right;color:#374151;">₹{r['last_close']:,.2f}</td>
-          <td style="padding:12px 16px;text-align:right;font-weight:700;color:{color};">{arrow} {abs(r['pct_gain']):.2f}%</td>
+          <td style="padding:12px 16px;font-weight:700;letter-spacing:0.5px;">{row.SYMBOL}</td>
+          <td style="padding:12px 16px;text-align:right;color:#374151;">₹{row.CLOSE_PRICE_prev:,.2f}</td>
+          <td style="padding:12px 16px;text-align:right;color:#374151;">₹{row.CLOSE_PRICE_last:,.2f}</td>
+          <td style="padding:12px 16px;text-align:right;font-weight:700;color:{color};">{arrow} {abs(row.pct_gain):.2f}%</td>
         </tr>"""
 
     return f"""<!DOCTYPE html>
@@ -143,7 +145,7 @@ def build_html(top10: list[dict], fri1: datetime, fri2: datetime) -> str:
         <tr>
           <td style="padding:16px 32px 28px;">
             <p style="margin:0;font-size:12px;color:#9ca3af;text-align:center;">
-              Prices sourced from Yahoo Finance. Not investment advice.
+              Prices sourced from NSE Bhavcopy. Not investment advice.
             </p>
           </td>
         </tr>
@@ -163,25 +165,6 @@ def send_email(subject: str, html: str):
     )
     resp.raise_for_status()
     print(f"Email sent: {resp.json()}")
-
-
-def main():
-    today = datetime.today()
-    fri1 = last_friday(today)
-    fri2 = last_friday(fri1 - timedelta(days=1))
-
-    symbols = get_nifty500_symbols()
-    closes = get_friday_closes(symbols)
-    top10 = rank_top10(closes)
-
-    if not top10:
-        print("No data — aborting email send")
-        sys.exit(1)
-
-    subject = f"Nifty 500 Top 10 Gainers — Week of {fri1.strftime('%d %b %Y')}"
-    html = build_html(top10, fri1, fri2)
-    send_email(subject, html)
-    print("Done.")
 
 
 if __name__ == "__main__":

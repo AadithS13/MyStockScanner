@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime
 from data import get_nifty500_symbols, get_price_history, get_stock_ohlcv
-from signals import generate_signals, compute_rsi, compute_rsi_series
+from signals import generate_signals, compute_rsi, compute_rsi_series, compute_macd
 
 st.set_page_config(
     page_title="My Trading Dashboard",
@@ -27,9 +27,9 @@ div[data-testid="metric-container"] { background: #1e293b; border-radius: 10px; 
 st.markdown("## 📈 My Trading Dashboard")
 st.caption(f"Nifty 500 · NSE Bhavcopy · {datetime.now().strftime('%d %b %Y, %I:%M %p IST')}")
 
-with st.spinner("Loading 30 days of market data..."):
+with st.spinner("Loading 60 days of market data (first load takes ~60s, then cached)..."):
     nifty500 = get_nifty500_symbols()
-    history = get_price_history(n_days=30)
+    history = get_price_history(n_days=60)
 
 closes = history["closes"]
 volumes = history["volumes"]
@@ -85,23 +85,34 @@ with tab2:
 
     fc, sc = st.columns([3, 2])
     with fc:
-        sig_opts = ["🟢 Buy", "🟡 Watch", "🟡 Oversold Bounce", "⚪ Neutral", "🔴 Overbought"]
-        selected_sigs = st.multiselect("Filter signals", sig_opts, default=["🟢 Buy", "🟡 Oversold Bounce"])
+        sig_opts = ["🟢 Strong Buy", "🟢 Buy", "🟡 Watch", "⚪ Neutral", "🔴 Overbought"]
+        selected_sigs = st.multiselect("Filter signals", sig_opts, default=["🟢 Strong Buy", "🟢 Buy"])
     with sc:
-        sort_col = st.selectbox("Sort by", ["Score", "RSI", "Week (%)", "vs 20DMA (%)"])
+        sort_col = st.selectbox("Sort by", ["Score", "Upside (%)", "RSI", "R/R Ratio", "vs 20DMA (%)"])
 
     filtered = signals_df[signals_df["Signal"].isin(selected_sigs)] if selected_sigs else signals_df
     asc = sort_col == "RSI"
     filtered = filtered.sort_values(sort_col, ascending=asc).reset_index(drop=True)
 
+    display_cols = ["Symbol", "Price (₹)", "Signal", "Score", "RSI", "MACD",
+                    "vs 20DMA (%)", "vs 50DMA (%)", "Vol Ratio",
+                    "Target (₹)", "Upside (%)", "Stop Loss (₹)", "R/R Ratio", "Timeline"]
+
     def _color_signal(val):
-        if "Buy" in str(val) or "Bounce" in str(val):
+        if "Strong Buy" in str(val):
+            return "color: #22c55e; font-weight: bold"
+        if "Buy" in str(val):
             return "color: #4ade80; font-weight: bold"
         if "Overbought" in str(val):
             return "color: #f87171; font-weight: bold"
         if "Watch" in str(val):
             return "color: #fbbf24; font-weight: bold"
         return "color: #94a3b8"
+
+    def _color_macd(val):
+        if val == "Bullish":
+            return "color: #4ade80"
+        return "color: #f87171"
 
     def _color_num(val):
         try:
@@ -110,12 +121,16 @@ with tab2:
             return ""
 
     styled = (
-        filtered.style
+        filtered[display_cols].style
         .map(_color_signal, subset=["Signal"])
-        .map(_color_num, subset=["Week (%)", "vs 20DMA (%)"])
+        .map(_color_macd, subset=["MACD"])
+        .map(_color_num, subset=["vs 20DMA (%)", "vs 50DMA (%)", "Upside (%)"])
     )
     st.dataframe(styled, use_container_width=True, hide_index=True, height=520)
-    st.caption(f"Showing {len(filtered)} of {len(signals_df)} Nifty 500 stocks")
+    st.caption(
+        f"Showing {len(filtered)} of {len(signals_df)} Nifty 500 stocks  ·  "
+        "Target = next resistance level  ·  Timeline = estimated based on momentum  ·  Not financial advice"
+    )
 
 # ── Tab 3: Stock Detail ────────────────────────────────────────────────────────
 with tab3:
@@ -130,7 +145,12 @@ with tab3:
         st.warning(f"No data found for {selected} in the last 30 days.")
     else:
         ohlcv["ma20"] = ohlcv["close"].rolling(20).mean()
+        ohlcv["ma50"] = ohlcv["close"].rolling(50).mean()
         ohlcv["rsi"] = compute_rsi_series(ohlcv["close"])
+        macd_line, signal_line, macd_hist = compute_macd(ohlcv["close"])
+        ohlcv["macd"] = macd_line
+        ohlcv["macd_signal"] = signal_line
+        ohlcv["macd_hist"] = macd_hist
 
         cur = ohlcv["close"].iloc[-1]
         prev_w = ohlcv["close"].iloc[-6] if len(ohlcv) >= 6 else ohlcv["close"].iloc[0]
@@ -146,39 +166,65 @@ with tab3:
         m4.metric("vs 20-day MA", f"{vs_ma:+.2f}%" if not pd.isna(vs_ma) else "–")
 
         fig = make_subplots(
-            rows=2, cols=1, shared_xaxes=True,
-            row_heights=[0.68, 0.32], vertical_spacing=0.04,
+            rows=3, cols=1, shared_xaxes=True,
+            row_heights=[0.55, 0.22, 0.23], vertical_spacing=0.03,
+            subplot_titles=("Price", "RSI (14)", "MACD"),
         )
 
+        # Price + MAs
         fig.add_trace(
             go.Scatter(x=ohlcv["date"], y=ohlcv["close"], name="Close",
                        line=dict(color="#60a5fa", width=2), fill="tozeroy",
-                       fillcolor="rgba(96,165,250,0.08)"),
+                       fillcolor="rgba(96,165,250,0.06)"),
             row=1, col=1,
         )
         fig.add_trace(
-            go.Scatter(x=ohlcv["date"], y=ohlcv["ma20"], name="20-day MA",
+            go.Scatter(x=ohlcv["date"], y=ohlcv["ma20"], name="20DMA",
                        line=dict(color="#f59e0b", width=1.5, dash="dash")),
             row=1, col=1,
         )
+        fig.add_trace(
+            go.Scatter(x=ohlcv["date"], y=ohlcv["ma50"], name="50DMA",
+                       line=dict(color="#ec4899", width=1.5, dash="dot")),
+            row=1, col=1,
+        )
+
+        # RSI
         fig.add_trace(
             go.Scatter(x=ohlcv["date"], y=ohlcv["rsi"], name="RSI",
                        line=dict(color="#a78bfa", width=1.5)),
             row=2, col=1,
         )
-        fig.add_hline(y=70, line_dash="dot", line_color="#f87171", opacity=0.6, row=2, col=1)
-        fig.add_hline(y=30, line_dash="dot", line_color="#4ade80", opacity=0.6, row=2, col=1)
-        fig.add_hrect(y0=30, y1=70, fillcolor="rgba(255,255,255,0.02)", line_width=0, row=2, col=1)
+        fig.add_hline(y=70, line_dash="dot", line_color="#f87171", opacity=0.5, row=2, col=1)
+        fig.add_hline(y=30, line_dash="dot", line_color="#4ade80", opacity=0.5, row=2, col=1)
+
+        # MACD
+        colors = ["#4ade80" if v >= 0 else "#f87171" for v in ohlcv["macd_hist"].fillna(0)]
+        fig.add_trace(
+            go.Bar(x=ohlcv["date"], y=ohlcv["macd_hist"], name="Histogram",
+                   marker_color=colors, opacity=0.6),
+            row=3, col=1,
+        )
+        fig.add_trace(
+            go.Scatter(x=ohlcv["date"], y=ohlcv["macd"], name="MACD",
+                       line=dict(color="#60a5fa", width=1.5)),
+            row=3, col=1,
+        )
+        fig.add_trace(
+            go.Scatter(x=ohlcv["date"], y=ohlcv["macd_signal"], name="Signal",
+                       line=dict(color="#f59e0b", width=1.5)),
+            row=3, col=1,
+        )
 
         fig.update_layout(
             title=f"{selected}  ·  Last {len(ohlcv)} trading days",
             paper_bgcolor="#0f172a",
             plot_bgcolor="#0f172a",
             font=dict(color="#94a3b8"),
-            height=480,
+            height=580,
             hovermode="x unified",
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
-            margin=dict(l=0, r=0, t=50, b=0),
+            margin=dict(l=0, r=0, t=60, b=0),
         )
         fig.update_xaxes(gridcolor="#1e293b", zeroline=False)
         fig.update_yaxes(gridcolor="#1e293b", zeroline=False)

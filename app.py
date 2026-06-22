@@ -18,42 +18,50 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
-/* ── Animated background layers (CSS-only, no JS) ── */
-[data-testid="stApp"]::before {
+/* ── Base: dark background on body only ── */
+html, body {
+    background: #0a0a0a !important;
+    font-family: 'Inter', system-ui, sans-serif !important;
+    color: #e5e5e5 !important;
+}
+
+/* Make all Streamlit containers transparent so background shows through */
+[data-testid="stApp"], .stApp,
+[data-testid="stMainBlockContainer"],
+[data-testid="stAppViewContainer"],
+[data-testid="stVerticalBlock"],
+.main, .block-container,
+section.main > div { background: transparent !important; }
+
+/* ── Animated nebula (on body, z-index: -1 so it's behind everything) ── */
+body::before {
     content: '';
     position: fixed;
     inset: 0;
     background:
-        radial-gradient(circle at 15% 25%, rgba(74,222,128,.07) 0%, transparent 45%),
-        radial-gradient(circle at 85% 70%, rgba(74,222,128,.045) 0%, transparent 45%),
-        radial-gradient(circle at 50% 90%, rgba(96,165,250,.03) 0%, transparent 40%);
+        radial-gradient(circle at 15% 25%, rgba(74,222,128,.09) 0%, transparent 45%),
+        radial-gradient(circle at 85% 70%, rgba(74,222,128,.06) 0%, transparent 45%),
+        radial-gradient(circle at 50% 90%, rgba(96,165,250,.04) 0%, transparent 40%);
     animation: nebula-drift 28s ease-in-out infinite alternate;
     pointer-events: none;
-    z-index: 0;
+    z-index: -1;
 }
 @keyframes nebula-drift {
     0%   { opacity:1; transform: scale(1)    translate(0,0); }
-    50%  { opacity:.7; transform: scale(1.06) translate(3%,2%); }
+    50%  { opacity:.75; transform: scale(1.07) translate(3%,2%); }
     100% { opacity:1; transform: scale(1)    translate(-2%,-1%); }
 }
-/* dot grid */
-[data-testid="stApp"]::after {
+/* ── Dot grid (on body, z-index: -1) ── */
+body::after {
     content: '';
     position: fixed;
     inset: 0;
-    background-image: radial-gradient(rgba(74,222,128,.055) 1px, transparent 1px);
+    background-image: radial-gradient(rgba(74,222,128,.07) 1px, transparent 1px);
     background-size: 30px 30px;
     mask-image: radial-gradient(ellipse 90% 70% at 50% 40%, #000 30%, transparent 100%);
     -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 40%, #000 30%, transparent 100%);
     pointer-events: none;
-    z-index: 0;
-}
-
-/* Base */
-html, body, [data-testid="stApp"], .stApp {
-    background: #0a0a0a !important;
-    font-family: 'Inter', system-ui, sans-serif !important;
-    color: #e5e5e5 !important;
+    z-index: -1;
 }
 [data-testid="stHeader"],
 [data-testid="stToolbar"],

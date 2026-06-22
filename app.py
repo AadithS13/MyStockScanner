@@ -1,5 +1,4 @@
 import streamlit as st
-import streamlit.components.v1 as components
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -15,7 +14,7 @@ st.set_page_config(
 )
 
 # ── Background animation (same particle/canvas engine as portfolio) ──────────
-components.html("""
+st.iframe("""
 <script>
 (function () {
   try {
@@ -117,7 +116,7 @@ components.html("""
   } catch(e) { console.warn('AI Trader BG:', e); }
 })();
 </script>
-""", height=0, scrolling=False)
+""", height=0)
 
 # ── Global CSS theme ──────────────────────────────────────────────────────────
 st.markdown("""
@@ -247,7 +246,7 @@ with st.sidebar:
     st.divider()
 
     page = st.radio(
-        "",
+        "Navigation",
         ["📊  Overview", "🎯  Swing Signals", "🔍  Stock Detail", "💼  My Portfolio"],
         label_visibility="collapsed",
     )

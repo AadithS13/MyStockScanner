@@ -13,115 +13,41 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── Background animation (same particle/canvas engine as portfolio) ──────────
-st.iframe("""
-<script>
-(function () {
-  try {
-    var W = window.parent, doc = W.document;
-    if (doc.getElementById('atrader-canvas')) return;
-
-    /* inject Google Font */
-    if (!doc.getElementById('atrader-font')) {
-      var lnk = doc.createElement('link');
-      lnk.id = 'atrader-font';
-      lnk.rel = 'stylesheet';
-      lnk.href = 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap';
-      doc.head.appendChild(lnk);
-    }
-
-    /* canvas */
-    var cv = doc.createElement('canvas');
-    cv.id = 'atrader-canvas';
-    cv.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;';
-    doc.body.insertBefore(cv, doc.body.firstChild);
-    var ctx = cv.getContext('2d');
-
-    /* cursor spotlight */
-    var spot = doc.createElement('div');
-    spot.id = 'atrader-spot';
-    spot.style.cssText = 'position:fixed;top:0;left:0;width:700px;height:700px;border-radius:50%;pointer-events:none;z-index:1;opacity:0;transition:opacity .5s;background:radial-gradient(circle,rgba(74,222,128,.055) 0%,transparent 65%);';
-    doc.body.insertBefore(spot, cv.nextSibling);
-
-    var Ww = W.innerWidth, Wh = W.innerHeight;
-    var mouse = { x: -9999, y: -9999 }, sp = { x: 0, y: 0 }, spInit = false;
-
-    function resize() {
-      Ww = W.innerWidth; Wh = W.innerHeight;
-      cv.width = Ww; cv.height = Wh;
-    }
-    resize();
-
-    /* particles */
-    var N = Math.min(55, Math.floor(Ww * Wh / 28000));
-    var pts = [];
-    for (var i = 0; i < N; i++) pts.push({ x: Math.random()*Ww, y: Math.random()*Wh, vx:(Math.random()-.5)*.28, vy:(Math.random()-.5)*.28, r:Math.random()*1.4+.5 });
-
-    /* rising candlesticks */
-    var CK = 30;
-    var cks = [];
-    for (var i = 0; i < CK; i++) cks.push({ x:Math.random()*Ww, y:Math.random()*Wh, bh:8+Math.random()*22, wh:4+Math.random()*14, sp:.08+Math.random()*.22, bull:Math.random()>.32, a:.03+Math.random()*.05 });
-
-    var LINK = 125;
-
-    doc.addEventListener('mousemove', function(e) {
-      mouse.x = e.clientX; mouse.y = e.clientY;
-      if (!spInit) { sp.x = mouse.x; sp.y = mouse.y; spInit = true; }
-      sp.x += (mouse.x - sp.x) * .08;
-      sp.y += (mouse.y - sp.y) * .08;
-      spot.style.opacity = '1';
-      spot.style.transform = 'translate3d('+(sp.x-350)+'px,'+(sp.y-350)+'px,0)';
-    });
-    doc.addEventListener('mouseleave', function() { spot.style.opacity = '0'; });
-    W.addEventListener('resize', resize);
-
-    function frame() {
-      ctx.clearRect(0, 0, Ww, Wh);
-
-      /* candlesticks */
-      cks.forEach(function(c) {
-        var col = c.bull ? 'rgba(74,222,128,'+c.a+')' : 'rgba(239,68,68,'+(c.a*.5)+')';
-        ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.moveTo(c.x, c.y-c.bh/2-c.wh); ctx.lineTo(c.x, c.y+c.bh/2+c.wh/2); ctx.stroke();
-        ctx.fillRect(c.x-3, c.y-c.bh/2, 6, c.bh);
-        c.y -= c.sp;
-        if (c.y+c.bh+c.wh < 0) { c.y = Wh+30; c.x = Math.random()*Ww; c.bull = Math.random()>.32; c.bh = 8+Math.random()*22; }
-      });
-
-      /* particles */
-      pts.forEach(function(p) {
-        p.x += p.vx; p.y += p.vy;
-        p.vx *= .998; p.vy *= .998;
-        if (p.x < -10) p.x = Ww+10; if (p.x > Ww+10) p.x = -10;
-        if (p.y < -10) p.y = Wh+10; if (p.y > Wh+10) p.y = -10;
-        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
-        ctx.fillStyle = 'rgba(74,222,128,.22)'; ctx.fill();
-      });
-
-      /* links */
-      for (var i = 0; i < pts.length; i++) for (var j = i+1; j < pts.length; j++) {
-        var dx = pts[i].x-pts[j].x, dy = pts[i].y-pts[j].y, d = Math.sqrt(dx*dx+dy*dy);
-        if (d < LINK) { ctx.beginPath(); ctx.moveTo(pts[i].x,pts[i].y); ctx.lineTo(pts[j].x,pts[j].y); ctx.strokeStyle='rgba(74,222,128,'+((1-d/LINK)*.07)+')'; ctx.lineWidth=1; ctx.stroke(); }
-      }
-
-      /* mouse links */
-      pts.forEach(function(p) {
-        var dx=p.x-mouse.x, dy=p.y-mouse.y, d=Math.sqrt(dx*dx+dy*dy);
-        if (d < 160) { ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(mouse.x,mouse.y); ctx.strokeStyle='rgba(74,222,128,'+((1-d/160)*.18)+')'; ctx.lineWidth=1; ctx.stroke(); }
-      });
-
-      W.requestAnimationFrame(frame);
-    }
-    frame();
-  } catch(e) { console.warn('AI Trader BG:', e); }
-})();
-</script>
-""", height=0)
-
 # ── Global CSS theme ──────────────────────────────────────────────────────────
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* ── Animated background layers (CSS-only, no JS) ── */
+[data-testid="stApp"]::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+        radial-gradient(circle at 15% 25%, rgba(74,222,128,.07) 0%, transparent 45%),
+        radial-gradient(circle at 85% 70%, rgba(74,222,128,.045) 0%, transparent 45%),
+        radial-gradient(circle at 50% 90%, rgba(96,165,250,.03) 0%, transparent 40%);
+    animation: nebula-drift 28s ease-in-out infinite alternate;
+    pointer-events: none;
+    z-index: 0;
+}
+@keyframes nebula-drift {
+    0%   { opacity:1; transform: scale(1)    translate(0,0); }
+    50%  { opacity:.7; transform: scale(1.06) translate(3%,2%); }
+    100% { opacity:1; transform: scale(1)    translate(-2%,-1%); }
+}
+/* dot grid */
+[data-testid="stApp"]::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: radial-gradient(rgba(74,222,128,.055) 1px, transparent 1px);
+    background-size: 30px 30px;
+    mask-image: radial-gradient(ellipse 90% 70% at 50% 40%, #000 30%, transparent 100%);
+    -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 40%, #000 30%, transparent 100%);
+    pointer-events: none;
+    z-index: 0;
+}
 
 /* Base */
 html, body, [data-testid="stApp"], .stApp {

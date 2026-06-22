@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import requests
 import yfinance as yf
 import pandas as pd
@@ -45,31 +46,41 @@ def get_friday_closes(symbols: list[str]) -> dict[str, tuple[float, float]]:
     end = (fri1 + timedelta(days=2)).strftime("%Y-%m-%d")
 
     closes: dict[str, tuple[float, float]] = {}
-    batch_size = 50
+    batch_size = 20
 
     for i in range(0, len(symbols), batch_size):
         batch = symbols[i : i + batch_size]
         tickers = [s + ".NS" for s in batch]
-        try:
-            raw = yf.download(
-                tickers,
-                start=start,
-                end=end,
-                auto_adjust=True,
-                progress=False,
-                threads=True,
-            )
-            close = raw["Close"] if "Close" in raw.columns else raw
-            for sym, ticker in zip(batch, tickers):
-                try:
-                    series = close[ticker].dropna()
-                    fri1_close = series.loc[series.index.normalize() <= pd.Timestamp(fri1.date())].iloc[-1]
-                    fri2_close = series.loc[series.index.normalize() <= pd.Timestamp(fri2.date())].iloc[-1]
-                    closes[sym] = (float(fri2_close), float(fri1_close))
-                except Exception:
-                    pass
-        except Exception as e:
-            print(f"Batch {i//batch_size + 1} failed: {e}")
+        batch_num = i // batch_size + 1
+        total_batches = (len(symbols) + batch_size - 1) // batch_size
+
+        for attempt in range(3):
+            try:
+                raw = yf.download(
+                    tickers,
+                    start=start,
+                    end=end,
+                    auto_adjust=True,
+                    progress=False,
+                    threads=False,
+                )
+                close = raw["Close"] if "Close" in raw.columns else raw
+                for sym, ticker in zip(batch, tickers):
+                    try:
+                        series = close[ticker].dropna()
+                        fri1_close = series.loc[series.index.normalize() <= pd.Timestamp(fri1.date())].iloc[-1]
+                        fri2_close = series.loc[series.index.normalize() <= pd.Timestamp(fri2.date())].iloc[-1]
+                        closes[sym] = (float(fri2_close), float(fri1_close))
+                    except Exception:
+                        pass
+                print(f"Batch {batch_num}/{total_batches} done ({len(closes)} total so far)")
+                break
+            except Exception as e:
+                wait = 10 * (attempt + 1)
+                print(f"Batch {batch_num} attempt {attempt+1} failed: {e} — retrying in {wait}s")
+                time.sleep(wait)
+
+        time.sleep(3)
 
     print(f"Successfully fetched closes for {len(closes)}/{len(symbols)} symbols")
     return closes

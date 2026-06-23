@@ -1,3 +1,4 @@
+from __future__ import annotations
 import requests
 import pandas as pd
 import streamlit as st

@@ -1,0 +1,9 @@
+# Heavy deps for the nightly learning job only (GitHub Actions / local).
+# The Streamlit Cloud app does NOT use these — it reads precomputed artifacts.
+pandas
+pyarrow
+requests
+scikit-learn
+xgboost
+shap
+yfinance

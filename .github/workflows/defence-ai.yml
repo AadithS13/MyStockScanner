@@ -1,0 +1,47 @@
+name: Defence AI — nightly learning loop
+
+# Runs each weekday evening IST (after NSE close + EOD data settles).
+# 13:30 UTC = 19:00 IST. The loop: refresh prices -> grade yesterday's
+# pending predictions -> retrain on the grown dataset -> log tomorrow's
+# picks -> commit the updated model & journal back to the repo.
+on:
+  schedule:
+    - cron: "30 13 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  learn:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install ML deps
+        run: pip install -r requirements-ml.txt
+
+      - name: Refresh price history
+        run: python backfill.py
+
+      - name: Validate → retrain → predict
+        run: python journal.py
+
+      - name: Commit updated artifacts
+        run: |
+          git config user.name  "defence-ai-bot"
+          git config user.email "actions@github.com"
+          git add data/defence_history.parquet data/defence_model.json \
+                  data/defence_model_meta.json data/feature_importance.csv \
+                  data/predictions.csv
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: nightly defence AI update ($(date -u +%Y-%m-%d))"
+            git push
+          fi

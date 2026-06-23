@@ -6,12 +6,159 @@ from datetime import datetime
 from data import get_nifty500_symbols, get_price_history, get_stock_ohlcv
 from signals import generate_signals, compute_rsi, compute_rsi_series, compute_macd
 
+try:
+    import ai_data
+    from defence import NAMES as DEFENCE_NAMES
+    _AI_OK = ai_data.ai_available()
+except Exception:  # noqa: BLE001 — keep the rest of the app working without the ML extras
+    _AI_OK = False
+
 st.set_page_config(
     page_title="My AI Trader",
     page_icon="📈",
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# ── Background animation (portfolio canvas engine, injected into parent) ─────
+st.iframe("""<!DOCTYPE html><html><head><style>body{margin:0;background:transparent}</style></head><body><script>
+(function(){
+  try{
+    var W=window.parent,doc=W.document;
+    if(doc.getElementById('at-cv'))return;
+
+    // canvas
+    var cv=doc.createElement('canvas');
+    cv.id='at-cv';
+    cv.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;';
+    doc.body.insertBefore(cv,doc.body.firstChild);
+    var ctx=cv.getContext('2d');
+
+    // spotlight
+    var sp=doc.createElement('div');
+    sp.id='at-sp';
+    sp.style.cssText='position:fixed;top:0;left:0;width:700px;height:700px;border-radius:50%;pointer-events:none;z-index:1;opacity:0;transition:opacity .5s;background:radial-gradient(circle,rgba(74,222,128,.06) 0%,transparent 65%);';
+    doc.body.insertBefore(sp,cv.nextSibling);
+
+    var Ww=W.innerWidth,Wh=W.innerHeight;
+    var mouse={x:-9999,y:-9999},spos={x:0,y:0},sinit=false;
+
+    function resize(){Ww=W.innerWidth;Wh=W.innerHeight;cv.width=Ww;cv.height=Wh;}
+    resize();
+
+    // stars (twinkling, 3 depths — exact portfolio logic)
+    var stars=[];
+    function mkStars(){
+      stars=[];
+      var n=Math.max(90,Math.min(220,Math.floor(Ww*Wh/9000)));
+      for(var i=0;i<n;i++){
+        var depth=Math.random(),roll=Math.random();
+        stars.push({x:Math.random()*Ww,y:Math.random()*Wh,r:.4+depth*1.1,depth:depth,
+          phase:Math.random()*Math.PI*2,speed:.4+Math.random()*1.4,base:.12+depth*.5,
+          hue:roll<.78?0:roll<.9?1:2});
+      }
+    }
+    mkStars();
+
+    // constellation particles
+    var pts=[];
+    function mkPts(){
+      pts=[];
+      var n=Math.max(36,Math.min(80,Math.floor(Ww*Wh/26000)));
+      for(var i=0;i<n;i++) pts.push({x:Math.random()*Ww,y:Math.random()*Wh,vx:(Math.random()-.5)*.34,vy:(Math.random()-.5)*.34,r:Math.random()*1.4+.6});
+    }
+    mkPts();
+
+    // candlestick drifters (instead of shooting stars)
+    var cks=[];
+    function mkCks(){
+      cks=[];
+      for(var i=0;i<28;i++) cks.push({x:Math.random()*Ww,y:Math.random()*Wh,bh:8+Math.random()*22,wh:4+Math.random()*14,sp:.08+Math.random()*.2,bull:Math.random()>.32,a:.04+Math.random()*.05});
+    }
+    mkCks();
+
+    var LINK=130,t=0;
+
+    function starColor(hue,a){
+      if(hue===1)return'rgba(74,222,128,'+a+')';
+      if(hue===2)return'rgba(96,165,250,'+a+')';
+      return'rgba(226,232,240,'+a+')';
+    }
+
+    function frame(){
+      t+=.016;
+      ctx.clearRect(0,0,Ww,Wh);
+
+      // stars
+      for(var i=0;i<stars.length;i++){
+        var s=stars[i];
+        var tw=.55+.45*Math.sin(t*s.speed+s.phase);
+        var a=s.base*tw;
+        s.y+=.012+s.depth*.03; if(s.y>Wh+4)s.y=-4;
+        ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+        ctx.fillStyle=starColor(s.hue,a);ctx.fill();
+        if(s.depth>.82&&tw>.92){
+          var len=s.r*5*(tw-.9)*10;
+          ctx.strokeStyle=starColor(s.hue,a*.5);ctx.lineWidth=.6;
+          ctx.beginPath();ctx.moveTo(s.x-len,s.y);ctx.lineTo(s.x+len,s.y);
+          ctx.moveTo(s.x,s.y-len);ctx.lineTo(s.x,s.y+len);ctx.stroke();
+        }
+      }
+
+      // rising candlesticks
+      for(var i=0;i<cks.length;i++){
+        var c=cks[i];
+        var col=c.bull?'rgba(74,222,128,'+c.a+')':'rgba(239,68,68,'+(c.a*.4)+')';
+        ctx.strokeStyle=col;ctx.fillStyle=col;ctx.lineWidth=1;
+        ctx.beginPath();ctx.moveTo(c.x,c.y-c.bh/2-c.wh);ctx.lineTo(c.x,c.y+c.bh/2+c.wh/2);ctx.stroke();
+        ctx.fillRect(c.x-3,c.y-c.bh/2,6,c.bh);
+        c.y-=c.sp;
+        if(c.y+c.bh+c.wh<0){c.y=Wh+30;c.x=Math.random()*Ww;c.bull=Math.random()>.32;c.bh=8+Math.random()*22;}
+      }
+
+      // particles
+      for(var i=0;i<pts.length;i++){
+        var p=pts[i];
+        p.x+=p.vx;p.y+=p.vy;p.vx*=.995;p.vy*=.995;
+        if(p.x<-10)p.x=Ww+10;if(p.x>Ww+10)p.x=-10;
+        if(p.y<-10)p.y=Wh+10;if(p.y>Wh+10)p.y=-10;
+        ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+        ctx.fillStyle='rgba(74,222,128,.28)';ctx.fill();
+      }
+
+      // links between particles
+      for(var i=0;i<pts.length;i++) for(var j=i+1;j<pts.length;j++){
+        var dx=pts[i].x-pts[j].x,dy=pts[i].y-pts[j].y,d=Math.sqrt(dx*dx+dy*dy);
+        if(d<LINK){ctx.beginPath();ctx.moveTo(pts[i].x,pts[i].y);ctx.lineTo(pts[j].x,pts[j].y);ctx.strokeStyle='rgba(74,222,128,'+((1-d/LINK)*.09)+')';ctx.lineWidth=1;ctx.stroke();}
+      }
+
+      // mouse links
+      for(var i=0;i<pts.length;i++){
+        var dx=pts[i].x-mouse.x,dy=pts[i].y-mouse.y,d=Math.sqrt(dx*dx+dy*dy);
+        if(d<170){ctx.beginPath();ctx.moveTo(pts[i].x,pts[i].y);ctx.lineTo(mouse.x,mouse.y);ctx.strokeStyle='rgba(74,222,128,'+((1-d/170)*.2)+')';ctx.lineWidth=1;ctx.stroke();}
+      }
+
+      // spotlight lerp
+      if(sinit){
+        spos.x+=(mouse.x-spos.x)*.08;spos.y+=(mouse.y-spos.y)*.08;
+        sp.style.transform='translate3d('+(spos.x-350)+'px,'+(spos.y-350)+'px,0)';
+      }
+
+      W.requestAnimationFrame(frame);
+    }
+
+    doc.addEventListener('mousemove',function(e){
+      mouse.x=e.clientX;mouse.y=e.clientY;
+      if(!sinit){spos.x=mouse.x;spos.y=mouse.y;sinit=true;}
+      sp.style.opacity='1';
+    });
+    doc.addEventListener('mouseleave',function(){sp.style.opacity='0';});
+    W.addEventListener('resize',function(){resize();mkStars();mkPts();mkCks();});
+
+    frame();
+  }catch(e){console.warn('AT BG:',e);}
+})();
+</script></body></html>""", height=1)
 
 # ── Global CSS theme ──────────────────────────────────────────────────────────
 st.markdown("""
@@ -181,7 +328,8 @@ with st.sidebar:
 
     page = st.radio(
         "Navigation",
-        ["📊  Overview", "🎯  Swing Signals", "🔍  Stock Detail", "💼  My Portfolio"],
+        ["📊  Overview", "🎯  Swing Signals", "🤖  AI Lab — Defence",
+         "🧠  Feature Importance", "🔍  Stock Detail", "💼  My Portfolio"],
         label_visibility="collapsed",
     )
 
@@ -421,3 +569,146 @@ elif page == "💼  My Portfolio":
                 pf.style.map(_pnl, subset=["P&L (₹)", "P&L (%)"]),
                 width="stretch", hide_index=True,
             )
+
+# ── AI Lab — Defence ──────────────────────────────────────────────────────────
+elif page == "🤖  AI Lab — Defence":
+    st.markdown("## 🤖 AI Lab — Defence Sector")
+    st.caption("XGBoost next-day predictions that grade themselves every day and learn from the outcomes.")
+
+    if not _AI_OK:
+        st.warning("AI model not found. Run the nightly job (`python journal.py`) to generate predictions, "
+                   "then commit `data/defence_model.json` and `data/predictions.csv`.")
+        st.stop()
+
+    preds = ai_data.live_predictions()
+    score = ai_data.track_record()
+    meta = ai_data.model_meta()
+
+    # ── honest framing ──
+    st.markdown("""
+<div style="background:rgba(96,165,250,.06);border:1px solid rgba(96,165,250,.2);border-radius:10px;padding:12px 16px;font-size:12.5px;color:#9ca3af;line-height:1.7;margin-bottom:18px;">
+<b style="color:#60a5fa;">How to read this:</b> the model ranks defence stocks by probability of an <b>up</b> day tomorrow.
+It's a research aid, not a guarantee — out-of-sample edge is real but modest (AUC ≈ 0.56). Trust the <b>track record</b> below, not any single call.
+</div>
+""", unsafe_allow_html=True)
+
+    # ── live track record ──
+    if score.get("n", 0) > 0:
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Directional Accuracy", f"{score['accuracy']:.1%}",
+                  help=f"{score['n']} graded predictions, {score['first_date']} → {score['last_date']}")
+        edge = score["bullish_avg_ret"] - score["universe_avg_ret"]
+        m2.metric("Bullish picks · next-day", f"{score['bullish_avg_ret']:+.2%}",
+                  f"{edge:+.2%} vs universe")
+        m3.metric("Universe avg · next-day", f"{score['universe_avg_ret']:+.2%}")
+        m4.metric("Graded predictions", f"{score['n']:,}")
+    else:
+        st.info("No graded predictions yet — the track record fills in as outcomes arrive.")
+
+    if meta:
+        st.caption(f"Model retrained {meta.get('trained_at','?')[:16]} · "
+                   f"{meta.get('n_train','?')} training rows · through {meta.get('last_train_date','?')}")
+
+    st.divider()
+    st.markdown(f"### Today's picks · {pd.to_datetime(preds['date'].max()).strftime('%d %b %Y')}")
+    st.caption("Prediction is for the **next trading day's** close. Each call is logged and graded automatically.")
+
+    # rule-based score side-by-side (where the symbol exists in the Nifty-500 engine)
+    rule_scores = {}
+    try:
+        sig = generate_signals(closes, volumes, nifty500)
+        rule_scores = dict(zip(sig["Symbol"], sig["Score"]))
+    except Exception:  # noqa: BLE001
+        pass
+
+    for _, p in preds.iterrows():
+        sym = p["symbol"]
+        prob = p["proba"]
+        bullish = prob >= 0.5
+        col = "#4ade80" if bullish else "#ef4444"
+        label = "Bullish" if bullish else "Bearish"
+        name = DEFENCE_NAMES.get(sym, sym)
+        rscore = rule_scores.get(sym)
+        rule_html = (f'<span style="font-size:12px;color:#9ca3af;">Rule score '
+                     f'<b style="color:#e5e5e5;">{rscore:.0f}</b>/100</span>'
+                     if rscore is not None else
+                     '<span style="font-size:12px;color:#4b5563;">Rule score —</span>')
+
+        chips = ""
+        for s in p["signals"]:
+            pos = s["direction"] == "+"
+            c = "#4ade80" if pos else "#f87171"
+            bg = "rgba(74,222,128,.08)" if pos else "rgba(248,113,113,.08)"
+            chips += (f'<span style="display:inline-block;background:{bg};border:1px solid {c}33;'
+                      f'color:{c};border-radius:6px;padding:3px 10px;margin:3px 6px 3px 0;font-size:12px;">'
+                      f'{s["direction"]} {s["label"]}</span>')
+
+        st.markdown(f"""
+<div style="background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.07);border-left:3px solid {col};
+            border-radius:10px;padding:14px 18px;margin-bottom:10px;">
+  <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;">
+    <div>
+      <span style="font-size:16px;font-weight:700;color:#e5e5e5;">{sym}</span>
+      <span style="font-size:12px;color:#6b7280;margin-left:8px;">{name}</span>
+      <span style="font-size:12px;color:#6b7280;margin-left:8px;">· ₹{p['close']:,.1f}</span>
+    </div>
+    <div style="text-align:right;">
+      <span style="font-size:17px;font-weight:700;color:{col};">{label} {prob:.0%}</span><br>{rule_html}
+    </div>
+  </div>
+  <div style="margin-top:10px;">{chips}</div>
+</div>
+""", unsafe_allow_html=True)
+
+    # calibration
+    calib = score.get("calibration")
+    if calib is not None and not calib.empty:
+        st.divider()
+        st.markdown("### 📐 Calibration — does its confidence mean anything?")
+        st.caption("For each confidence bucket, the share of predictions that actually rose. "
+                   "Higher buckets should show higher up-rates if the model is honest.")
+        cdf = calib.copy()
+        cdf["proba"] = cdf["proba"].astype(str)
+        cdf["up_rate"] = (cdf["up_rate"] * 100).round(1)
+        cfig = go.Figure(go.Bar(
+            x=cdf["proba"], y=cdf["up_rate"], marker_color="#4ade80",
+            text=[f"{v:.0f}%" for v in cdf["up_rate"]], textposition="outside",
+        ))
+        cfig.update_layout(
+            template="plotly_dark", height=320, paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=10, r=10, t=10, b=10),
+            yaxis_title="Actual up-rate (%)", xaxis_title="Predicted probability bucket",
+        )
+        st.plotly_chart(cfig, width="stretch")
+
+# ── Feature Importance ────────────────────────────────────────────────────────
+elif page == "🧠  Feature Importance":
+    st.markdown("## 🧠 Feature Importance")
+    st.caption("What the model actually weighs when ranking defence stocks — global view across all predictions.")
+
+    if not _AI_OK:
+        st.warning("AI model not found. Run `python journal.py` first.")
+        st.stop()
+
+    imp = ai_data.importance()
+    st.markdown("""
+<div style="background:rgba(74,222,128,.05);border:1px solid rgba(74,222,128,.15);border-radius:10px;padding:12px 16px;font-size:12.5px;color:#9ca3af;line-height:1.7;margin-bottom:16px;">
+This is where XGBoost shines — every feature's contribution is measurable. Bars show each signal's share of the model's
+splitting decisions. Per-stock <b>+/−</b> attributions live on the <b>AI Lab</b> page.
+</div>
+""", unsafe_allow_html=True)
+
+    top = imp.head(18).iloc[::-1]
+    fig = go.Figure(go.Bar(
+        x=top["importance"], y=top["label"], orientation="h",
+        marker=dict(color=top["importance"], colorscale=[[0, "#1f3d2b"], [1, "#4ade80"]]),
+    ))
+    fig.update_layout(
+        template="plotly_dark", height=560, paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)", margin=dict(l=10, r=10, t=10, b=10),
+        xaxis_title="Relative importance",
+    )
+    st.plotly_chart(fig, width="stretch")
+
+    st.caption("Sector momentum signals typically dominate — defence stocks move as a bloc, so 'is the whole "
+               "sector hot?' carries real predictive weight.")

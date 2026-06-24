@@ -48,7 +48,20 @@ FEATURE_LABELS = {
     "dist_low_20": "above 20-day low",
     "up_days_10": "up-days in 10",
     "dow": "day of week",
+    # ── news / sentiment (GDELT tone) ──
+    "news_tone": "news tone today",
+    "news_tone_3d": "news tone (3-day)",
+    "news_active": "news coverage",
+    "sector_news_tone": "sector news tone",
+    "sector_news_tone_3d": "sector tone (3-day)",
+    "rel_news_tone": "vs sector news",
 }
+
+# Feature groups (handy for the dashboard: "did news help?")
+NEWS_FEATURES = [
+    "news_tone", "news_tone_3d", "news_active",
+    "sector_news_tone", "sector_news_tone_3d", "rel_news_tone",
+]
 
 FEATURE_COLS = list(FEATURE_LABELS.keys())
 
@@ -149,10 +162,85 @@ def _per_stock_features(g: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def build_features(history: pd.DataFrame) -> pd.DataFrame:
-    """Returns a long feature frame with FEATURE_COLS + close, fwd_ret_1d, target."""
+def _continuous_tone(tone: pd.DataFrame) -> pd.DataFrame:
+    """Reindex one entity's tone to continuous calendar days (missing = 0 tone),
+    then derive a 3-day rolling mean and a coverage flag. Calendar-day rolling
+    means weekend/holiday news still reaches the next trading day. Past-only
+    windows → leakage-safe."""
+    tone = tone.sort_values("date").set_index("date")
+    full = pd.date_range(tone.index.min(), tone.index.max(), freq="D")
+    s = tone["news_tone"].reindex(full).fillna(0.0)
+    out = pd.DataFrame({"date": full})
+    out["news_tone"] = s.values
+    out["news_tone_3d"] = s.rolling(3, min_periods=1).mean().values
+    out["news_active"] = (s.values != 0).astype(float)
+    return out
+
+
+def _merge_sentiment(feat: pd.DataFrame, sentiment: pd.DataFrame) -> pd.DataFrame:
+    """Attach per-stock + sector tone onto the feature frame by (symbol, date).
+    Missing tone defaults to 0 (neutral); the model learns its own weighting."""
+    news_cols = ["news_tone", "news_tone_3d", "news_active",
+                 "sector_news_tone", "sector_news_tone_3d", "rel_news_tone"]
+    if sentiment is None or sentiment.empty:
+        for c in news_cols:
+            feat[c] = 0.0
+        return feat
+
+    sentiment = sentiment.copy()
+    sentiment["date"] = pd.to_datetime(sentiment["date"])
+
+    # sector series
+    sec_raw = sentiment[sentiment["symbol"] == "__SECTOR__"][["date", "news_tone"]]
+    if not sec_raw.empty:
+        sec = _continuous_tone(sec_raw).rename(columns={
+            "news_tone": "sector_news_tone",
+            "news_tone_3d": "sector_news_tone_3d",
+            "news_active": "_sec_active",
+        })[["date", "sector_news_tone", "sector_news_tone_3d"]]
+    else:
+        sec = pd.DataFrame(columns=["date", "sector_news_tone", "sector_news_tone_3d"])
+
+    # per-stock series
+    parts = []
+    for sym, g in sentiment[sentiment["symbol"] != "__SECTOR__"].groupby("symbol"):
+        if g["date"].nunique() < 2:
+            continue
+        c = _continuous_tone(g[["date", "news_tone"]])
+        c["symbol"] = sym
+        parts.append(c)
+    stock = (pd.concat(parts, ignore_index=True)
+             if parts else
+             pd.DataFrame(columns=["date", "news_tone", "news_tone_3d",
+                                   "news_active", "symbol"]))
+
+    feat = feat.merge(stock, on=["symbol", "date"], how="left")
+    feat = feat.merge(sec, on="date", how="left")
+    for c in news_cols:
+        if c not in feat.columns:
+            feat[c] = 0.0
+    feat[news_cols] = feat[news_cols].fillna(0.0)
+    feat["rel_news_tone"] = feat["news_tone_3d"] - feat["sector_news_tone_3d"]
+    return feat
+
+
+def build_features(history: pd.DataFrame,
+                   sentiment: pd.DataFrame | None = None) -> pd.DataFrame:
+    """Returns a long feature frame with FEATURE_COLS + close, fwd_ret_1d, target.
+
+    `sentiment` is the GDELT tone frame (date, symbol, news_tone). If omitted,
+    it is loaded from disk; if unavailable, news features fall back to neutral 0
+    so the price-only path still works.
+    """
     history = history.copy()
     history["date"] = pd.to_datetime(history["date"])
+
+    if sentiment is None:
+        try:
+            from news import load_sentiment
+            sentiment = load_sentiment()
+        except Exception:  # noqa: BLE001
+            sentiment = None
 
     # leakage-safe equal-weight sector basket return per date
     history = history.sort_values(["symbol", "date"])
@@ -172,6 +260,9 @@ def build_features(history: pd.DataFrame) -> pd.DataFrame:
     feat = feat.merge(sector, on="date", how="left")
     feat = feat.merge(sector_5d, on="date", how="left")
     feat["rel_strength_5d"] = feat["ret_5d"] - feat["sector_ret_5d"]
+
+    # ── news / sentiment features (leakage-safe; neutral 0 where absent) ──
+    feat = _merge_sentiment(feat, sentiment)
 
     # IMPORTANT: keep target missing where the next-day return is unknown,
     # otherwise (NaN > 0) -> False silently mislabels the last day as "down".

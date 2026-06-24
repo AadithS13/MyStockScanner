@@ -1,0 +1,44 @@
+name: Sentiment backfill + news A/B (manual)
+
+# Run from the Actions tab ("Run workflow"). GitHub runners have a clean IP, so
+# GDELT does not throttle them the way a hammered local IP gets penalised.
+# Steps: pull GDELT tone history -> commit the parquet -> run the A/B test
+# (price-only vs price+news) and print the verdict to the run log.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install ML deps
+        run: pip install -r requirements-ml.txt
+
+      - name: Backfill GDELT sentiment (1yr)
+        run: python news.py
+
+      - name: Commit sentiment parquet
+        run: |
+          git config user.name  "sentiment-bot"
+          git config user.email "actions@github.com"
+          git add data/defence_sentiment.parquet
+          if git diff --staged --quiet; then
+            echo "No changes"
+          else
+            git commit -m "data: GDELT sentiment backfill ($(date -u +%Y-%m-%d))"
+            git push
+          fi
+
+      - name: News A/B — does news add edge?
+        run: python ab_news.py

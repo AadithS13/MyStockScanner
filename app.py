@@ -403,6 +403,58 @@ elif page == "🎯  Swing Signals":
     st.markdown("## 🎯 Swing Trade Signals")
     st.caption("RSI · MACD · 20DMA · 50DMA · Volume — 2-week swing horizon · Not financial advice")
 
+    # ── Track record: how did past Buy calls actually do? ──
+    import ai_data
+    rec = ai_data.swing_record()
+    if rec.get("n", 0) > 0:
+        st.markdown("#### 📈 Track record — how past calls played out")
+        st.caption(
+            f"Every Buy/Strong-Buy call is logged and graded after its 2-week horizon "
+            f"(did the close reach the target, hit the stop, or neither?). "
+            f"{rec['n']} graded calls · {rec['first_date']} → {rec['last_date']}."
+        )
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Win rate", f"{rec['win_rate']:.0%}",
+                  help="Share of calls that closed up or hit target within 2 weeks.")
+        c2.metric("Target hit", f"{rec['target_rate']:.0%}",
+                  help="Reached the projected target before the stop.")
+        c3.metric("Avg return", f"{rec['avg_ret']:+.2%}",
+                  delta=f"{rec['edge']:+.2%} vs market",
+                  help="Average 2-week return of the calls vs an equal-weight Nifty-500 baseline.")
+        c4.metric("Stopped out", f"{rec['stop_rate']:.0%}")
+
+        with st.expander("See the graded calls"):
+            recent = rec.get("recent")
+            if recent is not None and len(recent):
+                show = recent[["made_on", "symbol", "signal", "entry", "target",
+                               "stop", "outcome", "exit_close", "realised_ret",
+                               "market_ret"]].copy()
+                show = show.rename(columns={
+                    "made_on": "Date", "symbol": "Symbol", "signal": "Signal",
+                    "entry": "Entry", "target": "Target", "stop": "Stop",
+                    "outcome": "Outcome", "exit_close": "Exit",
+                    "realised_ret": "Return", "market_ret": "Market"})
+                show["Return"] = (show["Return"].astype(float) * 100).round(2)
+                show["Market"] = (show["Market"].astype(float) * 100).round(2)
+
+                def _out(v):
+                    return ("color:#22c55e;font-weight:700" if v == "TARGET"
+                            else "color:#ef4444;font-weight:600" if v == "STOP"
+                            else "color:#9ca3af")
+                def _ret(v):
+                    try: return f"color:{'#4ade80' if float(v) >= 0 else '#ef4444'}"
+                    except: return ""
+                st.dataframe(
+                    show.sort_values("Date", ascending=False).style
+                        .map(_out, subset=["Outcome"])
+                        .map(_ret, subset=["Return", "Market"]),
+                    width="stretch", hide_index=True, height=320,
+                )
+        st.divider()
+    else:
+        st.info("📈 Track record is building — calls get graded after their 2-week "
+                "horizon, then their hit-rate and returns appear here.")
+
     with st.spinner("Computing signals for 500 stocks…"):
         signals_df = generate_signals(closes, volumes, nifty500)
 
@@ -411,10 +463,32 @@ elif page == "🎯  Swing Signals":
         sig_opts = ["🟢 Strong Buy", "🟢 Buy", "🟡 Watch", "⚪ Neutral", "🔴 Overbought"]
         sel = st.multiselect("Filter", sig_opts, default=["🟢 Strong Buy", "🟢 Buy"])
     with sc:
-        sort_by = st.selectbox("Sort by", ["Score", "Upside (%)", "R/R Ratio", "RSI"])
+        sort_by = st.selectbox(
+            "Sort by",
+            ["Score", "Price (₹)", "Timeline", "Upside (%)", "R/R Ratio", "RSI"],
+        )
 
     filtered = signals_df[signals_df["Signal"].isin(sel)] if sel else signals_df
-    filtered = filtered.sort_values(sort_by, ascending=(sort_by == "RSI")).reset_index(drop=True)
+
+    def _timeline_key(v):
+        """Sort by the soonest target date; blanks ('–') sort last."""
+        s = str(v)
+        if "–" not in s or s.strip() == "–":
+            return pd.Timestamp.max
+        first = s.split("–")[0].strip()  # e.g. '5 Jun'
+        try:
+            return pd.to_datetime(f"{first} {datetime.now().year}", format="%d %b %Y")
+        except Exception:
+            return pd.Timestamp.max
+
+    if sort_by == "Timeline":
+        filtered = (filtered.assign(_k=filtered["Timeline"].map(_timeline_key))
+                    .sort_values("_k").drop(columns="_k"))
+    elif sort_by == "RSI":
+        filtered = filtered.sort_values("RSI", ascending=True)   # low RSI = more oversold
+    else:
+        filtered = filtered.sort_values(sort_by, ascending=False)  # high → low
+    filtered = filtered.reset_index(drop=True)
 
     COLS = ["Symbol", "Price (₹)", "Signal", "Score", "RSI", "MACD",
             "vs 20DMA (%)", "vs 50DMA (%)", "Vol Ratio",
@@ -610,8 +684,15 @@ It's a research aid, not a guarantee — out-of-sample edge is real but modest (
                    f"{meta.get('n_train','?')} training rows · through {meta.get('last_train_date','?')}")
 
     st.divider()
-    st.markdown(f"### Today's picks · {pd.to_datetime(preds['date'].max()).strftime('%d %b %Y')}")
-    st.caption("Prediction is for the **next trading day's** close. Each call is logged and graded automatically.")
+    asof = pd.to_datetime(preds['date'].max())
+    target = (asof + pd.tseries.offsets.BDay(1)).strftime('%d %b')
+    st.markdown(f"### Latest picks — as of {asof.strftime('%d %b %Y')} close")
+    st.caption(
+        f"Computed from the last **completed** session ({asof.strftime('%d %b')}); "
+        f"each call predicts that stock's **next trading-day** close (≈ {target}). "
+        f"If today's session is still open, the latest finished close is the prior day. "
+        f"Logged and graded automatically once the outcome is known."
+    )
 
     # rule-based score side-by-side (where the symbol exists in the Nifty-500 engine)
     rule_scores = {}

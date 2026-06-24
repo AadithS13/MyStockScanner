@@ -64,3 +64,29 @@ def model_meta() -> dict:
         with open(META) as f:
             return json.load(f)
     return {}
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def headlines(symbol: str, limit: int = 3) -> list[dict]:
+    """Recent Google News headlines for a stock (best-effort, display only)."""
+    try:
+        from news import fetch_headlines
+        return fetch_headlines(symbol, limit=limit)
+    except Exception:  # noqa: BLE001
+        return []
+
+
+SWING_JOURNAL = os.path.join(DATA_DIR, "swing_predictions.csv")
+
+
+def swing_available() -> bool:
+    return os.path.exists(SWING_JOURNAL)
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def swing_record() -> dict:
+    """Track record for the rule-based swing calls (reads the journal CSV)."""
+    if not os.path.exists(SWING_JOURNAL):
+        return {"n": 0}
+    from swing_journal import swing_scorecard
+    return swing_scorecard()

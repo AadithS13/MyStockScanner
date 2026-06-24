@@ -1,0 +1,41 @@
+name: Swing signals — weekly validate & log
+
+# Mondays 19:00 IST (13:30 UTC): grade matured 2-week swing calls against the
+# latest closes, then log this week's fresh Buy/Strong-Buy calls, and commit the
+# updated journal. Keeps the Swing Signals track record self-grading.
+on:
+  schedule:
+    - cron: "30 13 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  swing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install deps
+        run: pip install pandas numpy requests
+
+      - name: Validate matured calls → log this week's signals
+        run: python swing_journal.py
+
+      - name: Commit updated journal
+        run: |
+          git config user.name  "swing-journal-bot"
+          git config user.email "actions@github.com"
+          git add data/swing_predictions.csv
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: weekly swing journal update ($(date -u +%Y-%m-%d))"
+            git push
+          fi

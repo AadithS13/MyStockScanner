@@ -458,37 +458,13 @@ elif page == "🎯  Swing Signals":
     with st.spinner("Computing signals for 500 stocks…"):
         signals_df = generate_signals(closes, volumes, nifty500)
 
-    fc, sc = st.columns([3, 2])
-    with fc:
-        sig_opts = ["🟢 Strong Buy", "🟢 Buy", "🟡 Watch", "⚪ Neutral", "🔴 Overbought"]
-        sel = st.multiselect("Filter", sig_opts, default=["🟢 Strong Buy", "🟢 Buy"])
-    with sc:
-        sort_by = st.selectbox(
-            "Sort by",
-            ["Score", "Price (₹)", "Timeline", "Upside (%)", "R/R Ratio", "RSI"],
-        )
+    sig_opts = ["🟢 Strong Buy", "🟢 Buy", "🟡 Watch", "⚪ Neutral", "🔴 Overbought"]
+    sel = st.multiselect("Filter by signal", sig_opts,
+                         default=["🟢 Strong Buy", "🟢 Buy"])
 
     filtered = signals_df[signals_df["Signal"].isin(sel)] if sel else signals_df
-
-    def _timeline_key(v):
-        """Sort by the soonest target date; blanks ('–') sort last."""
-        s = str(v)
-        if "–" not in s or s.strip() == "–":
-            return pd.Timestamp.max
-        first = s.split("–")[0].strip()  # e.g. '5 Jun'
-        try:
-            return pd.to_datetime(f"{first} {datetime.now().year}", format="%d %b %Y")
-        except Exception:
-            return pd.Timestamp.max
-
-    if sort_by == "Timeline":
-        filtered = (filtered.assign(_k=filtered["Timeline"].map(_timeline_key))
-                    .sort_values("_k").drop(columns="_k"))
-    elif sort_by == "RSI":
-        filtered = filtered.sort_values("RSI", ascending=True)   # low RSI = more oversold
-    else:
-        filtered = filtered.sort_values(sort_by, ascending=False)  # high → low
-    filtered = filtered.reset_index(drop=True)
+    # initial order; users re-sort by clicking headers (Excel-style)
+    filtered = filtered.sort_values("Score", ascending=False).reset_index(drop=True)
 
     COLS = ["Symbol", "Price (₹)", "Signal", "Score", "RSI", "MACD",
             "vs 20DMA (%)", "vs 50DMA (%)", "Vol Ratio",
@@ -506,11 +482,32 @@ elif page == "🎯  Swing Signals":
         try: return f"color:{'#4ade80' if float(v)>=0 else '#ef4444'}"
         except: return ""
 
+    # clean number formatting (display only — underlying stays numeric so
+    # header-click sorting stays numeric, not lexical)
+    def _f(fs):
+        def fn(v):
+            try: return fs.format(v)
+            except (ValueError, TypeError): return v
+        return fn
+    num_fmt = {c: _f(s) for c, s in {
+        "Price (₹)": "₹{:,.2f}", "Score": "{:.0f}", "RSI": "{:.1f}",
+        "vs 20DMA (%)": "{:+.2f}", "vs 50DMA (%)": "{:+.2f}", "Vol Ratio": "{:.2f}×",
+        "Target (₹)": "₹{:,.2f}", "Upside (%)": "{:+.2f}",
+        "Stop Loss (₹)": "₹{:,.2f}", "R/R Ratio": "{:.2f}",
+    }.items()}
+
+    st.markdown("#### 🎯 Live signals — today's setups")
+    st.caption("💡 Click any column header to sort (click again to reverse) — like Excel.")
     st.dataframe(
-        filtered[COLS].style.map(_sig, subset=["Signal"]).map(_macd, subset=["MACD"]).map(_pct, subset=["vs 20DMA (%)", "vs 50DMA (%)", "Upside (%)"]),
+        filtered[COLS].style
+            .format(num_fmt)
+            .map(_sig, subset=["Signal"])
+            .map(_macd, subset=["MACD"])
+            .map(_pct, subset=["vs 20DMA (%)", "vs 50DMA (%)", "Upside (%)"]),
         width="stretch", hide_index=True, height=520,
     )
-    st.caption(f"Showing {len(filtered)} of {len(signals_df)} stocks  ·  Target = next resistance  ·  Stop = recent low or −7%")
+    st.caption(f"Showing {len(filtered)} of {len(signals_df)} stocks  ·  "
+               f"Target = next resistance  ·  Stop = recent low or −7%")
 
 # ── Stock Detail ──────────────────────────────────────────────────────────────
 elif page == "🔍  Stock Detail":

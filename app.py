@@ -311,6 +311,127 @@ h1,h2,h3,h4 { color: #e5e5e5 !important; font-family: 'Inter', system-ui, sans-s
 
 /* ── Plotly ── */
 .js-plotly-plot .plotly { background: transparent !important; }
+
+/* ═══════════ MOTION & POLISH LAYER ═══════════ */
+@keyframes fadeSlideUp {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes titleSheen {
+    0%, 100% { background-position: 0% 50%; }
+    50%      { background-position: 100% 50%; }
+}
+
+/* page content enters with a soft rise (transform/opacity only = cheap) */
+.main .block-container, [data-testid="stMainBlockContainer"] {
+    animation: fadeSlideUp .45s cubic-bezier(.22,.9,.36,1) both;
+}
+/* gentle stagger on the first few top-level blocks */
+[data-testid="stMainBlockContainer"] > div > div:nth-child(1) { animation: fadeSlideUp .4s .02s both; }
+[data-testid="stMainBlockContainer"] > div > div:nth-child(2) { animation: fadeSlideUp .4s .08s both; }
+[data-testid="stMainBlockContainer"] > div > div:nth-child(3) { animation: fadeSlideUp .4s .14s both; }
+[data-testid="stMainBlockContainer"] > div > div:nth-child(4) { animation: fadeSlideUp .4s .20s both; }
+
+/* headings get a living gradient */
+.main h2 {
+    background: linear-gradient(110deg, #e5e5e5 30%, #4ade80 50%, #e5e5e5 70%);
+    background-size: 200% auto;
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: titleSheen 6s ease-in-out infinite;
+}
+
+/* metric cards: lift + glow on hover, gradient hairline on top */
+[data-testid="metric-container"] {
+    position: relative !important;
+    transition: transform .22s ease, border-color .22s ease, box-shadow .22s ease !important;
+    overflow: hidden !important;
+}
+[data-testid="metric-container"]::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, rgba(74,222,128,.55), transparent);
+    opacity: 0; transition: opacity .25s ease;
+}
+[data-testid="metric-container"]:hover {
+    transform: translateY(-3px) !important;
+    border-color: rgba(74,222,128,.4) !important;
+    box-shadow: 0 8px 28px rgba(74,222,128,.10), 0 2px 8px rgba(0,0,0,.4) !important;
+}
+[data-testid="metric-container"]:hover::before { opacity: 1; }
+
+/* dataframes glow softly on hover */
+.stDataFrame { transition: box-shadow .25s ease !important; border-radius: 10px !important; }
+.stDataFrame:hover { box-shadow: 0 0 0 1px rgba(74,222,128,.25), 0 10px 32px rgba(0,0,0,.35) !important; }
+
+/* expanders: rounded card look with animated border */
+[data-testid="stExpander"] {
+    border: 1px solid rgba(74,222,128,.14) !important;
+    border-radius: 12px !important;
+    background: rgba(255,255,255,.015) !important;
+    transition: border-color .25s ease, box-shadow .25s ease !important;
+    overflow: hidden !important;
+}
+[data-testid="stExpander"]:hover {
+    border-color: rgba(74,222,128,.35) !important;
+    box-shadow: 0 4px 18px rgba(74,222,128,.06) !important;
+}
+[data-testid="stExpander"] summary {
+    color: #9ca3af !important;
+    transition: color .2s ease !important;
+}
+[data-testid="stExpander"] summary:hover { color: #4ade80 !important; }
+
+/* number inputs match the theme */
+.stNumberInput > div > div {
+    background: rgba(255,255,255,.03) !important;
+    border-color: rgba(74,222,128,.2) !important;
+    border-radius: 8px !important;
+}
+.stNumberInput input { color: #e5e5e5 !important; }
+.stNumberInput button { background: rgba(74,222,128,.08) !important; color: #4ade80 !important; }
+
+/* buttons: green ghost that fills on hover */
+.stButton > button, .stDownloadButton > button {
+    background: rgba(74,222,128,.08) !important;
+    color: #4ade80 !important;
+    border: 1px solid rgba(74,222,128,.35) !important;
+    border-radius: 8px !important;
+    transition: all .2s ease !important;
+}
+.stButton > button:hover, .stDownloadButton > button:hover {
+    background: rgba(74,222,128,.18) !important;
+    border-color: #4ade80 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 16px rgba(74,222,128,.18) !important;
+}
+
+/* sidebar nav: soft glow behind the active item */
+[data-testid="stSidebar"] .stRadio > div > label:has(input:checked) {
+    box-shadow: inset 0 0 18px rgba(74,222,128,.06), 0 0 12px rgba(74,222,128,.08) !important;
+}
+
+/* alerts/info boxes on-theme */
+.stAlert {
+    background: rgba(74,222,128,.05) !important;
+    border: 1px solid rgba(74,222,128,.2) !important;
+    border-radius: 10px !important;
+    color: #d1d5db !important;
+}
+
+/* slim dark scrollbar with green thumb */
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: #0a0a0a; }
+::-webkit-scrollbar-thumb {
+    background: rgba(74,222,128,.22);
+    border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(74,222,128,.45); }
+
+/* respect users who turn motion off */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+}
 </style>
 """, unsafe_allow_html=True)
 

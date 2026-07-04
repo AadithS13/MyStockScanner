@@ -90,3 +90,12 @@ def swing_record() -> dict:
         return {"n": 0}
     from swing_journal import swing_scorecard
     return swing_scorecard()
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def swing_learning() -> dict:
+    """Learned per-tier / per-score-bucket stats from graded swing outcomes."""
+    if not os.path.exists(SWING_JOURNAL):
+        return {"n": 0, "tiers": {}, "buckets": {}}
+    from swing_journal import learning_stats
+    return learning_stats()

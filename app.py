@@ -466,9 +466,29 @@ elif page == "🎯  Swing Signals":
     # initial order; users re-sort by clicking headers (Excel-style)
     filtered = filtered.sort_values("Score", ascending=False).reset_index(drop=True)
 
-    COLS = ["Symbol", "Price (₹)", "Signal", "Score", "RSI", "MACD",
-            "vs 20DMA (%)", "vs 50DMA (%)", "Vol Ratio",
+    # ── learned stats beside each prediction ──
+    learn = ai_data.swing_learning()
+    if learn.get("n", 0) > 0:
+        from swing_journal import annotate_with_learning
+        filtered = annotate_with_learning(filtered)
+        bucket_bits = []
+        for b, s in sorted(learn["buckets"].items(),
+                           key=lambda kv: kv[0], reverse=True):
+            bucket_bits.append(
+                f"**Score {b}** → {s['win_rate']:.0%} win · "
+                f"{s['avg_ret']:+.1%} avg (n={s['n']})")
+        st.markdown(
+            f"🧠 **Learned from {learn['n']} graded calls** — historical odds by "
+            f"score bucket:&nbsp;&nbsp;" + " &nbsp;·&nbsp; ".join(bucket_bits))
+        st.caption(
+            "『Hist Win %』and『Hist Avg %』beside each signal are the smoothed "
+            "outcomes of past calls in the same score bucket — they update "
+            "automatically every time the weekly loop grades more calls.")
+
+    COLS = ["Symbol", "Price (₹)", "Signal", "Score", "Hist Win %", "Hist Avg (%)",
+            "RSI", "MACD", "vs 20DMA (%)", "vs 50DMA (%)", "Vol Ratio",
             "Target (₹)", "Upside (%)", "Stop Loss (₹)", "R/R Ratio", "Timeline"]
+    COLS = [c for c in COLS if c in filtered.columns]
 
     def _sig(v):
         if "Strong" in str(v): return "color:#22c55e;font-weight:700"
@@ -494,18 +514,28 @@ elif page == "🎯  Swing Signals":
         "vs 20DMA (%)": "{:+.2f}", "vs 50DMA (%)": "{:+.2f}", "Vol Ratio": "{:.2f}×",
         "Target (₹)": "₹{:,.2f}", "Upside (%)": "{:+.2f}",
         "Stop Loss (₹)": "₹{:,.2f}", "R/R Ratio": "{:.2f}",
-    }.items()}
+        "Hist Win %": "{:.1f}", "Hist Avg (%)": "{:+.2f}",
+    }.items() if c in COLS}
+
+    def _win(v):
+        try:
+            return ("color:#4ade80;font-weight:600" if float(v) >= 50
+                    else "color:#f87171")
+        except (ValueError, TypeError):
+            return ""
 
     st.markdown("#### 🎯 Live signals — today's setups")
     st.caption("💡 Click any column header to sort (click again to reverse) — like Excel.")
-    st.dataframe(
-        filtered[COLS].style
-            .format(num_fmt)
-            .map(_sig, subset=["Signal"])
-            .map(_macd, subset=["MACD"])
-            .map(_pct, subset=["vs 20DMA (%)", "vs 50DMA (%)", "Upside (%)"]),
-        width="stretch", hide_index=True, height=520,
-    )
+    pct_cols = [c for c in ["vs 20DMA (%)", "vs 50DMA (%)", "Upside (%)",
+                            "Hist Avg (%)"] if c in COLS]
+    styled = (filtered[COLS].style
+              .format(num_fmt)
+              .map(_sig, subset=["Signal"])
+              .map(_macd, subset=["MACD"])
+              .map(_pct, subset=pct_cols))
+    if "Hist Win %" in COLS:
+        styled = styled.map(_win, subset=["Hist Win %"])
+    st.dataframe(styled, width="stretch", hide_index=True, height=520)
     st.caption(f"Showing {len(filtered)} of {len(signals_df)} stocks  ·  "
                f"Target = next resistance  ·  Stop = recent low or −7%")
 

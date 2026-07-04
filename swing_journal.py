@@ -226,6 +226,87 @@ def swing_scorecard() -> dict:
     }
 
 
+SCORE_BUCKETS = [(0, 55), (55, 70), (70, 85), (85, 101)]
+
+
+def _bucket_label(score: float) -> str:
+    for lo, hi in SCORE_BUCKETS:
+        if lo <= score < hi:
+            return f"{lo}–{min(hi, 100) - 1}"
+    return "?"
+
+
+def learning_stats() -> dict:
+    """What the system has LEARNED from its own graded calls.
+
+    Returns smoothed win-rates / avg returns per signal tier and per score
+    bucket, computed purely from validated journal outcomes. Small samples are
+    shrunk toward the global mean (empirical-Bayes, prior strength k=10) so a
+    bucket with 3 lucky calls doesn't claim a 100% win rate. These numbers are
+    re-derived on every run, so they sharpen automatically as the weekly
+    validation loop grades more calls — that is the learning.
+    """
+    jour = _load()
+    val = jour[jour["status"] == "validated"].copy()
+    if val.empty:
+        return {"n": 0, "tiers": {}, "buckets": {}}
+
+    val["score"] = val["score"].astype(float)
+    val["realised_ret"] = val["realised_ret"].astype(float)
+    val["correct"] = val["correct"].astype(str).isin(["True", "true", "1"])
+    val["target_hit"] = val["outcome"].astype(str) == "TARGET"
+
+    p0 = val["correct"].mean()          # global prior
+    K = 10                               # prior strength (pseudo-observations)
+
+    def _stats(g: pd.DataFrame) -> dict:
+        n = len(g)
+        return {
+            "n": n,
+            "win_rate": (g["correct"].sum() + K * p0) / (n + K),
+            "raw_win_rate": g["correct"].mean(),
+            "target_rate": g["target_hit"].mean(),
+            "avg_ret": g["realised_ret"].mean(),
+        }
+
+    tiers = {sig: _stats(g) for sig, g in val.groupby(val["signal"].astype(str))}
+    val["bucket"] = val["score"].map(_bucket_label)
+    buckets = {b: _stats(g) for b, g in val.groupby("bucket")}
+
+    return {"n": len(val), "global_win": p0, "tiers": tiers, "buckets": buckets,
+            "prior_k": K}
+
+
+def annotate_with_learning(signals_df: pd.DataFrame) -> pd.DataFrame:
+    """Attach learned historical stats BESIDE each live signal row.
+
+    Adds 'Hist Win %' and 'Hist Avg (%)' — the smoothed win-rate and average
+    2-week return of past graded calls in the same score bucket. NaN-safe: if
+    there is no history yet, columns are '–'.
+    """
+    stats = learning_stats()
+    out = signals_df.copy()
+    if stats["n"] == 0:
+        out["Hist Win %"] = "–"
+        out["Hist Avg (%)"] = "–"
+        return out
+
+    # fallback: bucket stats → global (for buckets with no graded history yet)
+    global_win = round(stats["global_win"] * 100, 1)
+
+    def _win(score):
+        b = stats["buckets"].get(_bucket_label(float(score)))
+        return round(b["win_rate"] * 100, 1) if b else global_win
+
+    def _ret(score):
+        b = stats["buckets"].get(_bucket_label(float(score)))
+        return round(b["avg_ret"] * 100, 2) if b else 0.0
+
+    out["Hist Win %"] = out["Score"].map(_win)
+    out["Hist Avg (%)"] = out["Score"].map(_ret)
+    return out
+
+
 # ── seeding ──────────────────────────────────────────────────────────────────
 def seed_from_history(n_days: int = 75) -> None:
     """Replay past as-of dates so we have a graded track record immediately."""

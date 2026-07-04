@@ -54,8 +54,12 @@ def _stock_query(symbol: str) -> str:
 
 
 def _gdelt_tone(query: str, start: datetime, end: datetime,
-                retries: int = 4) -> pd.DataFrame:
-    """Daily tone timeline for one query. Returns DataFrame[date, news_tone]."""
+                retries: int = 8) -> pd.DataFrame:
+    """Daily tone timeline for one query. Returns DataFrame[date, news_tone].
+
+    On 429 we wait a flat 6s (just over GDELT's 1-per-5s limit) and retry —
+    cheaper than escalating backoff, which wasted ~100s per throttled chunk.
+    """
     params = dict(
         query=query, mode="timelinetone", format="json",
         startdatetime=start.strftime("%Y%m%d000000"),
@@ -65,7 +69,7 @@ def _gdelt_tone(query: str, start: datetime, end: datetime,
         try:
             r = requests.get(GDELT_URL, params=params, headers=UA, timeout=30)
             if r.status_code == 429:
-                time.sleep(GDELT_GAP * (attempt + 1))
+                time.sleep(6)
                 continue
             r.raise_for_status()
             data = r.json()
@@ -84,8 +88,14 @@ def _gdelt_tone(query: str, start: datetime, end: datetime,
     return pd.DataFrame(columns=["date", "news_tone"])
 
 
+# Entities worth fetching: the sector (covers everything) + the large caps that
+# GDELT actually indexes well. Small caps are too sparse/slow to be worth it.
+CORE_ENTITIES = ["__SECTOR__", "HAL", "BEL", "BDL", "MAZDOCK", "COCHINSHIP", "GRSE"]
+
+
 def build_sentiment_history(years: int = 1, chunk_months: int = 3,
-                            resume: bool = True) -> pd.DataFrame:
+                            resume: bool = True,
+                            only: list[str] | None = None) -> pd.DataFrame:
     """Backfill daily tone for every stock + the sector basket.
 
     Chunks the date range so GDELT keeps daily (not weekly) resolution and so a
@@ -107,6 +117,9 @@ def build_sentiment_history(years: int = 1, chunk_months: int = 3,
     entities = [(SECTOR_KEY, SECTOR_QUERY)] + [
         (sym, _stock_query(sym)) for sym in DEFENCE_STOCKS
     ]
+    if only is not None:
+        only_set = set(only)
+        entities = [(k, q) for k, q in entities if k in only_set]
 
     # resume: load whatever we already have, skip done entities
     done: set[str] = set()
@@ -190,4 +203,19 @@ def _vader():
 
 
 if __name__ == "__main__":
-    build_sentiment_history()
+    import sys
+    # usage:
+    #   python news.py            -> core entities (sector + large caps)
+    #   python news.py all        -> every defence stock (slow, GDELT-throttled)
+    #   python news.py sector     -> sector tone only (fastest)
+    #   python news.py HAL,BEL    -> explicit list
+    arg = sys.argv[1] if len(sys.argv) > 1 else "core"
+    if arg == "all":
+        sel = None
+    elif arg == "sector":
+        sel = ["__SECTOR__"]
+    elif arg == "core":
+        sel = CORE_ENTITIES
+    else:
+        sel = [s.strip() for s in arg.split(",")]
+    build_sentiment_history(only=sel)

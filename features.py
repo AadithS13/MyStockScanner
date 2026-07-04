@@ -63,7 +63,14 @@ NEWS_FEATURES = [
     "sector_news_tone", "sector_news_tone_3d", "rel_news_tone",
 ]
 
-FEATURE_COLS = list(FEATURE_LABELS.keys())
+PRICE_FEATURES = [c for c in FEATURE_LABELS if c not in NEWS_FEATURES]
+
+# PRODUCTION feature set. News features are excluded: the 2026-06 A/B test
+# showed sector-level tone REDUCES out-of-sample AUC (0.5683 -> 0.5571) —
+# one shared value per day adds no cross-sectional ranking power, and coverage
+# before Oct 2025 is neutral-zero noise. We keep collecting tone data and can
+# re-run ab_news.py once per-stock coverage matures.
+FEATURE_COLS = PRICE_FEATURES
 
 # Label: was the next day an up day? (clean, interpretable probability)
 LABEL_THRESHOLD = 0.0
@@ -271,10 +278,15 @@ def build_features(history: pd.DataFrame,
     return feat
 
 
-def train_frame(feat: pd.DataFrame) -> pd.DataFrame:
-    """Rows usable for training: have all features AND a known label."""
-    cols = FEATURE_COLS + ["target", "fwd_ret_1d", "date", "symbol", "close"]
-    df = feat[cols].dropna(subset=FEATURE_COLS + ["target"]).copy()
+def train_frame(feat: pd.DataFrame, feature_cols: list[str] | None = None) -> pd.DataFrame:
+    """Rows usable for training: have all features AND a known label.
+
+    `feature_cols` defaults to the production set; the A/B harness passes
+    PRICE_FEATURES + NEWS_FEATURES to keep news columns in the frame.
+    """
+    fc = feature_cols or FEATURE_COLS
+    cols = fc + ["target", "fwd_ret_1d", "date", "symbol", "close"]
+    df = feat[cols].dropna(subset=fc + ["target"]).copy()
     df["target"] = df["target"].astype(int)
     return df
 

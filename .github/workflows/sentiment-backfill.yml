@@ -13,7 +13,7 @@ permissions:
 jobs:
   backfill:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -25,8 +25,8 @@ jobs:
       - name: Install ML deps
         run: pip install -r requirements-ml.txt
 
-      - name: Backfill GDELT sentiment (1yr)
-        run: python news.py
+      - name: Backfill GDELT sentiment (1yr, core entities)
+        run: python news.py core
 
       - name: Commit sentiment parquet
         run: |

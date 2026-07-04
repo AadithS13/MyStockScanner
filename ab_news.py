@@ -18,10 +18,11 @@ warnings.filterwarnings("ignore")
 
 from backfill import load_history
 from news import load_sentiment
-from features import build_features, train_frame, FEATURE_COLS, NEWS_FEATURES
+from features import build_features, train_frame, PRICE_FEATURES, NEWS_FEATURES
 from ml_model import PARAMS
 
-PRICE_COLS = [c for c in FEATURE_COLS if c not in NEWS_FEATURES]
+PRICE_COLS = PRICE_FEATURES
+ALL_COLS = PRICE_FEATURES + NEWS_FEATURES
 
 
 def backtest(df: pd.DataFrame, cols: list[str], n_folds=6, initial_frac=0.45) -> dict:
@@ -66,11 +67,11 @@ def main():
           f"({sent['symbol'].nunique()} entities)\n")
 
     feat = build_features(hist, sentiment=sent)
-    df = train_frame(feat)
+    df = train_frame(feat, feature_cols=ALL_COLS)
     print(f"Training rows: {len(df)}  ({df['date'].min().date()} → {df['date'].max().date()})\n")
 
     price = backtest(df, PRICE_COLS)
-    full = backtest(df, FEATURE_COLS)
+    full = backtest(df, ALL_COLS)
 
     def row(name, a, b, fmt, better_high=True):
         da, db = a, b

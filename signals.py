@@ -167,9 +167,17 @@ def generate_signals(closes: pd.DataFrame, volumes: pd.DataFrame, nifty500: set)
             target = current + (recent_high - recent_low) * 0.5
 
         upside_pct = (target - current) / current * 100
-        stop_loss = max(recent_low, current * 0.93)  # recent low or 7% stop
+        # Volatility-aware stop: 2.5×σ20 below price, clamped to 3–7%, never
+        # below the structural recent low. Pros size stops to each stock's own
+        # volatility rather than one flat % for everything.
+        sigma20 = prices.pct_change().tail(20).std()
+        vol_stop_pct = min(0.07, max(0.03, 2.5 * sigma20)) if not pd.isna(sigma20) else 0.07
+        stop_loss = max(recent_low, current * (1 - vol_stop_pct))
         risk_pct = (current - stop_loss) / current * 100
         rr_ratio = upside_pct / risk_pct if risk_pct > 0 else 0
+
+        # compact "why" from the factor breakdown (was computed then discarded)
+        why = " · ".join(f"{k}: {v}" for k, v in score_breakdown.items())
 
         if score >= 70 and not pd.isna(week_pct) and week_pct > 3:
             timeline = _timeline_dates(1, 2)
@@ -195,6 +203,7 @@ def generate_signals(closes: pd.DataFrame, volumes: pd.DataFrame, nifty500: set)
             "Stop Loss (₹)": round(stop_loss, 2),
             "R/R Ratio": round(rr_ratio, 2),
             "Timeline": timeline,
+            "Why": why,
         })
 
     return pd.DataFrame(results).sort_values("Score", ascending=False).reset_index(drop=True)

@@ -458,11 +458,32 @@ elif page == "🎯  Swing Signals":
     with st.spinner("Computing signals for 500 stocks…"):
         signals_df = generate_signals(closes, volumes, nifty500)
 
-    sig_opts = ["🟢 Strong Buy", "🟢 Buy", "🟡 Watch", "⚪ Neutral", "🔴 Overbought"]
-    sel = st.multiselect("Filter by signal", sig_opts,
-                         default=["🟢 Strong Buy", "🟢 Buy"])
+    fcol, ccol, rcol = st.columns([2.4, 1, 1])
+    with fcol:
+        sig_opts = ["🟢 Strong Buy", "🟢 Buy", "🟡 Watch", "⚪ Neutral", "🔴 Overbought"]
+        sel = st.multiselect("Filter by signal", sig_opts,
+                             default=["🟢 Strong Buy", "🟢 Buy"])
+    with ccol:
+        capital = st.number_input("Capital (₹)", min_value=10_000, value=100_000,
+                                  step=10_000,
+                                  help="Total trading capital for position sizing.")
+    with rcol:
+        risk_pct_in = st.number_input("Risk per trade (%)", min_value=0.25,
+                                      max_value=5.0, value=1.0, step=0.25,
+                                      help="Max % of capital lost if the stop is hit "
+                                           "(pros: 0.5–2%). Qty = capital×risk ÷ "
+                                           "(entry − stop).")
 
     filtered = signals_df[signals_df["Signal"].isin(sel)] if sel else signals_df
+
+    # risk-based position sizing: fixed-fractional (the professional standard)
+    risk_amt = capital * risk_pct_in / 100
+    per_share_risk = (filtered["Price (₹)"] - filtered["Stop Loss (₹)"]).clip(lower=0)
+    qty = (risk_amt / per_share_risk.replace(0, float("nan"))).fillna(0)
+    # cap so a tight stop can't demand more capital than we have
+    qty = qty.clip(upper=(capital / filtered["Price (₹)"]).fillna(0)).astype(int)
+    filtered = filtered.assign(**{"Qty": qty,
+                                  "Position (₹)": (qty * filtered["Price (₹)"]).round(0)})
     # initial order; users re-sort by clicking headers (Excel-style)
     filtered = filtered.sort_values("Score", ascending=False).reset_index(drop=True)
 
@@ -487,7 +508,8 @@ elif page == "🎯  Swing Signals":
 
     COLS = ["Symbol", "Price (₹)", "Signal", "Score", "Hist Win %", "Hist Avg (%)",
             "RSI", "MACD", "vs 20DMA (%)", "vs 50DMA (%)", "Vol Ratio",
-            "Target (₹)", "Upside (%)", "Stop Loss (₹)", "R/R Ratio", "Timeline"]
+            "Target (₹)", "Upside (%)", "Stop Loss (₹)", "R/R Ratio",
+            "Qty", "Position (₹)", "Timeline", "Why"]
     COLS = [c for c in COLS if c in filtered.columns]
 
     def _sig(v):
@@ -515,6 +537,7 @@ elif page == "🎯  Swing Signals":
         "Target (₹)": "₹{:,.2f}", "Upside (%)": "{:+.2f}",
         "Stop Loss (₹)": "₹{:,.2f}", "R/R Ratio": "{:.2f}",
         "Hist Win %": "{:.1f}", "Hist Avg (%)": "{:+.2f}",
+        "Qty": "{:,.0f}", "Position (₹)": "₹{:,.0f}",
     }.items() if c in COLS}
 
     def _win(v):
@@ -537,7 +560,10 @@ elif page == "🎯  Swing Signals":
         styled = styled.map(_win, subset=["Hist Win %"])
     st.dataframe(styled, width="stretch", hide_index=True, height=520)
     st.caption(f"Showing {len(filtered)} of {len(signals_df)} stocks  ·  "
-               f"Target = next resistance  ·  Stop = recent low or −7%")
+               f"Target = next resistance  ·  Stop = volatility-aware "
+               f"(2.5×σ₂₀, clamped 3–7%, respects recent low)  ·  "
+               f"Qty = ₹{risk_amt:,.0f} risk ÷ stop distance  ·  "
+               f"'Why' = factor breakdown behind the score")
 
 # ── Stock Detail ──────────────────────────────────────────────────────────────
 elif page == "🔍  Stock Detail":

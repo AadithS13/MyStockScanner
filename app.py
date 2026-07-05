@@ -37,10 +37,24 @@ html, body, [data-testid="stAppViewContainer"], .stApp {
 [data-testid="stMainBlockContainer"], .main, .block-container,
 [data-testid="stVerticalBlock"] { background: transparent !important; }
 
-[data-testid="stHeader"],
+/* header stays (it holds the sidebar-reopen arrow) but goes invisible */
+[data-testid="stHeader"] {
+    background: transparent !important;
+    height: 2.2rem !important;
+}
 [data-testid="stToolbar"],
 [data-testid="stDecoration"],
-[data-testid="stStatusWidget"] { display: none !important; }
+[data-testid="stStatusWidget"],
+#MainMenu { display: none !important; }
+/* the reopen / collapse chevrons */
+[data-testid="stSidebarCollapsedControl"],
+[data-testid="stExpandSidebarButton"],
+[data-testid="stSidebarCollapseButton"] {
+    display: flex !important;
+    color: #8a95a1 !important;
+}
+[data-testid="stSidebarCollapsedControl"] button,
+[data-testid="stSidebarCollapseButton"] button { color: #8a95a1 !important; }
 
 [data-testid="stMainBlockContainer"],
 .main .block-container {
@@ -55,49 +69,45 @@ html, body, [data-testid="stAppViewContainer"], .stApp {
 }
 [data-testid="stSidebar"] > div:first-child { padding: 1.4rem 0.9rem !important; }
 
-/* nav items: full-width rows, fixed icon column, quiet grey → green when active */
-[data-testid="stSidebar"] .stRadio > label { display: none !important; }
-[data-testid="stSidebar"] .stRadio > div { gap: 3px !important; flex-direction: column !important; }
-[data-testid="stSidebar"] .stRadio > div > label {
+/* nav: native st.page_link rows — full-width, fixed icon column */
+[data-testid="stSidebar"] [data-testid="stPageLink-NavLink"],
+[data-testid="stSidebar"] a[data-testid="stPageLink"] {
     display: flex !important;
     align-items: center !important;
     width: 100% !important;
     padding: 10px 12px !important;
     border-radius: 9px !important;
     color: #8a95a1 !important;
-    font-size: 14px !important;
-    cursor: pointer !important;
+    text-decoration: none !important;
     transition: background .15s ease, color .15s ease !important;
-    margin: 0 !important;
+    margin: 1.5px 0 !important;
 }
-[data-testid="stSidebar"] .stRadio > div > label:hover {
+[data-testid="stSidebar"] [data-testid="stPageLink-NavLink"]:hover,
+[data-testid="stSidebar"] a[data-testid="stPageLink"]:hover {
     background: #171c22 !important;
     color: #c6ced6 !important;
 }
-[data-testid="stSidebar"] .stRadio > div > label:has(input:checked) {
+/* current page: green pill (Streamlit marks it with aria-current) */
+[data-testid="stSidebar"] [aria-current="page"] {
     background: rgba(0,200,83,.10) !important;
     color: #00c853 !important;
+}
+[data-testid="stSidebar"] [aria-current="page"] p,
+[data-testid="stSidebar"] [aria-current="page"] span { color: #00c853 !important; }
+[data-testid="stSidebar"] [data-testid="stPageLink-NavLink"] p,
+[data-testid="stSidebar"] a[data-testid="stPageLink"] p {
+    color: inherit !important;
+    font-size: 14px !important;
     font-weight: 500 !important;
+    margin: 0 !important;
+    white-space: nowrap !important;
 }
-[data-testid="stSidebar"] .stRadio > div > label > div:first-child { display: none !important; }
-/* label content fills the row; icon gets a fixed, aligned column */
-[data-testid="stSidebar"] .stRadio > div > label > div {
-    display: flex !important;
-    align-items: center !important;
-    width: 100% !important;
-}
-[data-testid="stSidebar"] .stRadio label [data-testid="stIconMaterial"],
-[data-testid="stSidebar"] .stRadio label span[class*="material-symbols"] {
+[data-testid="stSidebar"] [data-testid="stPageLink-NavLink"] [data-testid="stIconMaterial"],
+[data-testid="stSidebar"] [data-testid="stPageLink-NavLink"] span[class*="material-symbols"] {
     font-size: 19px !important;
     width: 30px !important;
     flex-shrink: 0 !important;
     color: inherit !important;
-}
-[data-testid="stSidebar"] .stRadio label p {
-    color: inherit !important;
-    font-size: 14px !important;
-    margin: 0 !important;
-    white-space: nowrap !important;
 }
 [data-testid="stSidebar"] hr {
     border-color: #1e242b !important;
@@ -237,35 +247,7 @@ hr { border-color: #1e242b !important; }
 """, unsafe_allow_html=True)
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
-with st.sidebar:
-    st.markdown("""
-    <div style="display:flex;align-items:center;gap:10px;padding:2px 4px 14px 4px;">
-      <div style="width:34px;height:34px;border-radius:9px;background:#00c853;display:flex;
-                  align-items:center;justify-content:center;color:#04240f;
-                  font-weight:600;font-size:14px;flex-shrink:0;">AT</div>
-      <div>
-        <div style="font-size:15px;font-weight:600;color:#eef2f6;letter-spacing:-.2px;">AI Trader</div>
-        <div style="font-size:10.5px;color:#5c6672;margin-top:1px;">NSE · Nifty 500</div>
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.divider()
-
-    page = st.radio(
-        "Navigation",
-        [":material/dashboard: Overview", ":material/track_changes: Swing Signals", ":material/smart_toy: AI Lab — Defence",
-         ":material/psychology: Feature Importance", ":material/candlestick_chart: Stock Detail", ":material/work: My Portfolio"],
-        label_visibility="collapsed",
-    )
-
-    st.divider()
-    st.markdown(f"""
-    <div style="padding:0 4px;font-size:11px;color:#5c6672;line-height:1.9;">
-      <div>{datetime.now().strftime('%d %b %Y, %I:%M %p')}</div>
-      <div>Data refreshes hourly</div>
-    </div>
-    """, unsafe_allow_html=True)
+# (sidebar is rendered after st.navigation registration, near the end of file)
 
 # ── Load data ─────────────────────────────────────────────────────────────────
 with st.spinner("Loading 60 days of market data…"):
@@ -285,7 +267,7 @@ if closes.empty:
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Overview ──────────────────────────────────────────────────────────────────
-if page == ":material/dashboard: Overview":
+def overview_page():
     st.markdown("## 📊 Market Overview")
     st.caption(f"Week-on-week performance across Nifty 500 — as of {closes.index[-1].strftime('%d %b %Y')}")
 
@@ -325,7 +307,7 @@ if page == ":material/dashboard: Overview":
             )
 
 # ── Swing Signals ─────────────────────────────────────────────────────────────
-elif page == ":material/track_changes: Swing Signals":
+def swing_page():
     st.markdown("## 🎯 Swing Trade Signals")
     st.caption("RSI · MACD · 20DMA · 50DMA · Volume — 2-week swing horizon · Not financial advice")
 
@@ -540,7 +522,7 @@ elif page == ":material/track_changes: Swing Signals":
                f"'Why' = factor breakdown behind the score")
 
 # ── Stock Detail ──────────────────────────────────────────────────────────────
-elif page == ":material/candlestick_chart: Stock Detail":
+def stock_detail_page():
     st.markdown("## 🔍 Stock Detail")
 
     syms = sorted(nifty500)
@@ -637,7 +619,7 @@ elif page == ":material/candlestick_chart: Stock Detail":
             )
 
 # ── Portfolio ─────────────────────────────────────────────────────────────────
-elif page == ":material/work: My Portfolio":
+def portfolio_page():
     st.markdown("## 💼 My Portfolio")
     st.caption("Enter holdings — one per line. P&L updates live against today's prices.")
 
@@ -701,7 +683,7 @@ elif page == ":material/work: My Portfolio":
             )
 
 # ── AI Lab — Defence ──────────────────────────────────────────────────────────
-elif page == ":material/smart_toy: AI Lab — Defence":
+def ai_lab_page():
     st.markdown("## 🤖 AI Lab — Defence Sector")
     st.caption("XGBoost next-day predictions that grade themselves every day and learn from the outcomes.")
 
@@ -819,7 +801,7 @@ It's a research aid, not a guarantee — out-of-sample edge is real but modest (
         st.plotly_chart(cfig, width="stretch")
 
 # ── Feature Importance ────────────────────────────────────────────────────────
-elif page == ":material/psychology: Feature Importance":
+def feature_importance_page():
     st.markdown("## 🧠 Feature Importance")
     st.caption("What the model actually weighs when ranking defence stocks — global view across all predictions.")
 
@@ -849,3 +831,46 @@ splitting decisions. Per-stock <b>+/−</b> attributions live on the <b>AI Lab</
 
     st.caption("Sector momentum signals typically dominate — defence stocks move as a bloc, so 'is the whole "
                "sector hot?' carries real predictive weight.")
+
+
+# ── Navigation (native component) ─────────────────────────────────────────────
+_PAGES = [
+    st.Page(overview_page, title="Overview", icon=":material/dashboard:",
+            url_path="overview", default=True),
+    st.Page(swing_page, title="Swing Signals", icon=":material/track_changes:",
+            url_path="swing-signals"),
+    st.Page(ai_lab_page, title="AI Lab — Defence", icon=":material/smart_toy:",
+            url_path="ai-lab"),
+    st.Page(feature_importance_page, title="Feature Importance",
+            icon=":material/psychology:", url_path="feature-importance"),
+    st.Page(stock_detail_page, title="Stock Detail",
+            icon=":material/candlestick_chart:", url_path="stock-detail"),
+    st.Page(portfolio_page, title="My Portfolio", icon=":material/work:",
+            url_path="portfolio"),
+]
+_nav = st.navigation(_PAGES, position="hidden")
+
+with st.sidebar:
+    st.markdown("""
+    <div style="display:flex;align-items:center;gap:10px;padding:2px 4px 14px 4px;">
+      <div style="width:34px;height:34px;border-radius:9px;background:#00c853;display:flex;
+                  align-items:center;justify-content:center;color:#04240f;
+                  font-weight:600;font-size:14px;flex-shrink:0;">AT</div>
+      <div>
+        <div style="font-size:15px;font-weight:600;color:#eef2f6;letter-spacing:-.2px;">AI Trader</div>
+        <div style="font-size:10.5px;color:#5c6672;margin-top:1px;">NSE · Nifty 500</div>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+    st.divider()
+    for _p in _PAGES:
+        st.page_link(_p)
+    st.divider()
+    st.markdown(f"""
+    <div style="padding:0 4px;font-size:11px;color:#5c6672;line-height:1.9;">
+      <div>{datetime.now().strftime('%d %b %Y, %I:%M %p')}</div>
+      <div>Data refreshes hourly</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+_nav.run()

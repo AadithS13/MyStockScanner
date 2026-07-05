@@ -1,3 +1,4 @@
+import os
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
@@ -42,7 +43,11 @@ html, body, [data-testid="stAppViewContainer"], .stApp {
     background: transparent !important;
     height: 2.2rem !important;
 }
-[data-testid="stToolbar"],
+/* hide chrome actions only — stToolbar itself hosts the sidebar-expand
+   button, so it must stay rendered */
+[data-testid="stToolbarActions"],
+[data-testid="stAppDeployButton"],
+[data-testid="stMainMenu"],
 [data-testid="stDecoration"],
 [data-testid="stStatusWidget"],
 #MainMenu { display: none !important; }
@@ -69,7 +74,11 @@ html, body, [data-testid="stAppViewContainer"], .stApp {
 }
 [data-testid="stSidebar"] > div:first-child { padding: 1.4rem 0.9rem !important; }
 
-/* nav: native st.page_link rows — full-width, fixed icon column */
+/* nav: native nav / page_link rows — full-width, fixed icon column */
+[data-testid="stSidebarNav"] { padding-top: .4rem !important; }
+[data-testid="stSidebarNavItems"] { padding: 0 !important; gap: 3px !important; }
+[data-testid="stSidebarNavSeparator"] { display: none !important; }
+[data-testid="stSidebar"] [data-testid="stSidebarNavLink"],
 [data-testid="stSidebar"] [data-testid="stPageLink-NavLink"],
 [data-testid="stSidebar"] a[data-testid="stPageLink"] {
     display: flex !important;
@@ -82,11 +91,24 @@ html, body, [data-testid="stAppViewContainer"], .stApp {
     transition: background .15s ease, color .15s ease !important;
     margin: 1.5px 0 !important;
 }
+[data-testid="stSidebar"] [data-testid="stSidebarNavLink"]:hover,
 [data-testid="stSidebar"] [data-testid="stPageLink-NavLink"]:hover,
 [data-testid="stSidebar"] a[data-testid="stPageLink"]:hover {
     background: #171c22 !important;
     color: #c6ced6 !important;
 }
+[data-testid="stSidebar"] [data-testid="stSidebarNavLink"] span,
+[data-testid="stSidebar"] [data-testid="stSidebarNavLink"] p {
+    color: inherit !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+}
+[data-testid="stSidebar"] [data-testid="stSidebarNavLink"] [data-testid="stIconMaterial"] {
+    font-size: 19px !important;
+    width: 30px !important;
+    flex-shrink: 0 !important;
+}
+[data-testid="stLogo"] { height: 3rem !important; margin: .4rem 0 .3rem .2rem !important; }
 /* current page: green pill (Streamlit marks it with aria-current) */
 [data-testid="stSidebar"] [aria-current="page"] {
     background: rgba(0,200,83,.10) !important;
@@ -268,7 +290,7 @@ if closes.empty:
 
 # ── Overview ──────────────────────────────────────────────────────────────────
 def overview_page():
-    st.markdown("## 📊 Market Overview")
+    st.markdown("## Market Overview")
     st.caption(f"Week-on-week performance across Nifty 500 — as of {closes.index[-1].strftime('%d %b %Y')}")
 
     if len(closes) >= 6:
@@ -287,35 +309,35 @@ def overview_page():
         col_g, col_l = st.columns(2)
 
         with col_g:
-            st.markdown("#### 🟢 Top 10 Gainers")
+            st.markdown("#### Top 10 gainers")
             top10 = wchg.nlargest(10).reset_index()
             top10.columns = ["Symbol", "Week (%)"]
             top10["Week (%)"] = top10["Week (%)"].round(2)
             st.dataframe(
-                top10.style.map(lambda v: "color:#00c853;font-weight:600", subset=["Week (%)"]),
+                top10.style.format({"Week (%)": "{:+.2f}"}).map(lambda v: "color:#00c853;font-weight:600", subset=["Week (%)"]),
                 width="stretch", hide_index=True,
             )
 
         with col_l:
-            st.markdown("#### 🔴 Top 10 Losers")
+            st.markdown("#### Top 10 losers")
             bot10 = wchg.nsmallest(10).reset_index()
             bot10.columns = ["Symbol", "Week (%)"]
             bot10["Week (%)"] = bot10["Week (%)"].round(2)
             st.dataframe(
-                bot10.style.map(lambda v: "color:#ff5252;font-weight:600", subset=["Week (%)"]),
+                bot10.style.format({"Week (%)": "{:+.2f}"}).map(lambda v: "color:#ff5252;font-weight:600", subset=["Week (%)"]),
                 width="stretch", hide_index=True,
             )
 
 # ── Swing Signals ─────────────────────────────────────────────────────────────
 def swing_page():
-    st.markdown("## 🎯 Swing Trade Signals")
+    st.markdown("## Swing Trade Signals")
     st.caption("RSI · MACD · 20DMA · 50DMA · Volume — 2-week swing horizon · Not financial advice")
 
     # ── Track record: how did past Buy calls actually do? ──
     import ai_data
     rec = ai_data.swing_record()
     if rec.get("n", 0) > 0:
-        st.markdown("#### 📈 Track record — how past calls played out")
+        st.markdown("#### Track record — how past calls played out")
         st.caption(
             f"Every Buy/Strong-Buy call is logged and graded after its 2-week horizon "
             f"(did the close reach the target, hit the stop, or neither?). "
@@ -503,7 +525,7 @@ def swing_page():
         except (ValueError, TypeError):
             return ""
 
-    st.markdown("#### 🎯 Live signals — today's setups")
+    st.markdown("#### Live signals — today's setups")
     st.caption("💡 Click any column header to sort (click again to reverse) — like Excel.")
     pct_cols = [c for c in ["vs 20DMA (%)", "vs 50DMA (%)", "Upside (%)",
                             "Hist Avg (%)"] if c in COLS]
@@ -523,7 +545,7 @@ def swing_page():
 
 # ── Stock Detail ──────────────────────────────────────────────────────────────
 def stock_detail_page():
-    st.markdown("## 🔍 Stock Detail")
+    st.markdown("## Stock Detail")
 
     syms = sorted(nifty500)
     sel = st.selectbox("Symbol", syms, index=syms.index("RELIANCE") if "RELIANCE" in syms else 0)
@@ -594,7 +616,7 @@ def stock_detail_page():
         _hist = _aid.swing_validated()
         if len(_hist) and (sym_hist := _hist[_hist["symbol"] == sel]).shape[0] > 0:
             wins = (sym_hist["realised_ret"] > 0).sum()
-            st.markdown(f"#### 📜 Our call history on {sel}")
+            st.markdown(f"#### Our call history on {sel}")
             st.caption(
                 f"{len(sym_hist)} graded swing call(s) · {wins} closed up · "
                 f"avg {sym_hist['realised_ret'].mean():+.2%} over the 2-week horizon")
@@ -620,7 +642,7 @@ def stock_detail_page():
 
 # ── Portfolio ─────────────────────────────────────────────────────────────────
 def portfolio_page():
-    st.markdown("## 💼 My Portfolio")
+    st.markdown("## My Portfolio")
     st.caption("Enter holdings — one per line. P&L updates live against today's prices.")
 
     col_inp, col_help = st.columns([3, 1])
@@ -684,7 +706,7 @@ def portfolio_page():
 
 # ── AI Lab — Defence ──────────────────────────────────────────────────────────
 def ai_lab_page():
-    st.markdown("## 🤖 AI Lab — Defence Sector")
+    st.markdown("## AI Lab — Defence Sector")
     st.caption("XGBoost next-day predictions that grade themselves every day and learn from the outcomes.")
 
     if not _AI_OK:
@@ -802,7 +824,7 @@ It's a research aid, not a guarantee — out-of-sample edge is real but modest (
 
 # ── Feature Importance ────────────────────────────────────────────────────────
 def feature_importance_page():
-    st.markdown("## 🧠 Feature Importance")
+    st.markdown("## Feature Importance")
     st.caption("What the model actually weighs when ranking defence stocks — global view across all predictions.")
 
     if not _AI_OK:
@@ -848,23 +870,13 @@ _PAGES = [
     st.Page(portfolio_page, title="My Portfolio", icon=":material/work:",
             url_path="portfolio"),
 ]
-_nav = st.navigation(_PAGES, position="hidden")
+# Fully native pattern: Streamlit renders the nav itself (can't disappear),
+# st.logo puts the brand above it, footer renders below via st.sidebar.
+_nav = st.navigation(_PAGES)
+st.logo(os.path.join(os.path.dirname(__file__), "assets", "logo.png"),
+        size="large")
 
 with st.sidebar:
-    st.markdown("""
-    <div style="display:flex;align-items:center;gap:10px;padding:2px 4px 14px 4px;">
-      <div style="width:34px;height:34px;border-radius:9px;background:#00c853;display:flex;
-                  align-items:center;justify-content:center;color:#04240f;
-                  font-weight:600;font-size:14px;flex-shrink:0;">AT</div>
-      <div>
-        <div style="font-size:15px;font-weight:600;color:#eef2f6;letter-spacing:-.2px;">AI Trader</div>
-        <div style="font-size:10.5px;color:#5c6672;margin-top:1px;">NSE · Nifty 500</div>
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
-    st.divider()
-    for _p in _PAGES:
-        st.page_link(_p)
     st.divider()
     st.markdown(f"""
     <div style="padding:0 4px;font-size:11px;color:#5c6672;line-height:1.9;">

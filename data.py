@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 import requests
 import pandas as pd
 import streamlit as st
@@ -49,9 +50,55 @@ def _fetch_bhavcopy_raw(date_str: str) -> pd.DataFrame | None:
         return None
 
 
+CACHE_PATH = os.path.join(os.path.dirname(__file__), "data", "n500_cache.parquet")
+CACHE_MAX_AGE_DAYS = 5  # weekend + a holiday; staler than this → try live fetch
+
+
+def _load_cache() -> dict | None:
+    """Instant load path: the committed parquet refreshed nightly by CI.
+
+    Returns the same {closes, volumes, raw} shape as the live path, or None
+    when the cache is missing/stale/unreadable (caller falls back to NSE).
+    This exists because cold-starting the cloud app on ~60 live NSE downloads
+    could hang for minutes (NSE archives are slow from non-Indian cloud IPs).
+    """
+    try:
+        if not os.path.exists(CACHE_PATH):
+            return None
+        df = pd.read_parquet(CACHE_PATH)
+        df["date"] = pd.to_datetime(df["date"])
+        last = df["date"].max()
+        if (pd.Timestamp.today().normalize() - last.normalize()).days > CACHE_MAX_AGE_DAYS:
+            return None  # bot hasn't refreshed lately — fall back to live
+
+        raw: dict[object, pd.DataFrame] = {}
+        for d, g in df.groupby("date"):
+            raw[d.date()] = g.rename(columns={
+                "symbol": "SYMBOL", "open": "OPEN_PRICE", "high": "HIGH_PRICE",
+                "low": "LOW_PRICE", "close": "CLOSE_PRICE",
+                "volume": "TTL_TRD_QNTY",
+            })[["SYMBOL", "OPEN_PRICE", "HIGH_PRICE", "LOW_PRICE",
+                "CLOSE_PRICE", "TTL_TRD_QNTY"]].reset_index(drop=True)
+
+        closes = df.pivot_table(index="date", columns="symbol",
+                                values="close").sort_index()
+        closes.index = [d.date() for d in closes.index]
+        volumes = df.pivot_table(index="date", columns="symbol",
+                                 values="volume").sort_index()
+        volumes.index = [d.date() for d in volumes.index]
+        return {"closes": closes, "volumes": volumes, "raw": raw}
+    except Exception:  # noqa: BLE001 — any cache problem → live fallback
+        return None
+
+
 @st.cache_data(ttl=3600, show_spinner=False)
 def get_price_history(n_days: int = 30) -> dict:
-    """Download last n trading days of bhavcopy data. Returns closes, volumes, and raw dfs."""
+    """Price history for the app. Reads the committed nightly cache instantly;
+    falls back to live NSE downloads only when the cache is missing/stale."""
+    cached = _load_cache()
+    if cached is not None:
+        return cached
+
     today = datetime.today()
     candidate = today - timedelta(days=1)
     raw: dict[object, pd.DataFrame] = {}

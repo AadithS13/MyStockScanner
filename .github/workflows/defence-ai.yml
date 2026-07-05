@@ -32,13 +32,16 @@ jobs:
       - name: Validate → retrain → predict
         run: python journal.py
 
+      - name: Refresh Nifty-500 price cache (app reads this instead of live NSE)
+        run: python cache_nifty500.py
+
       - name: Commit updated artifacts
         run: |
           git config user.name  "defence-ai-bot"
           git config user.email "actions@github.com"
           git add data/defence_history.parquet data/defence_model.json \
                   data/defence_model_meta.json data/feature_importance.csv \
-                  data/predictions.csv
+                  data/predictions.csv data/n500_cache.parquet
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else

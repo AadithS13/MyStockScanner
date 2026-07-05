@@ -235,6 +235,7 @@ h1,h2,h3,h4 {
 hr { border-color: #1e242b !important; }
 .stSpinner > div { border-top-color: #00c853 !important; }
 .js-plotly-plot .plotly { background: transparent !important; }
+.modebar, .modebar-container { display: none !important; }
 
 /* ── Alerts ── */
 .stAlert {
@@ -393,8 +394,7 @@ def swing_page():
                            ticksuffix="%", title=None),
                 hoverlabel=dict(bgcolor="#111", font=dict(color="#eef2f6")),
             )
-            st.plotly_chart(fig_eq, width="stretch",
-                            config={"displayModeBar": False})
+            st.plotly_chart(fig_eq, width="stretch")
             st.caption(
                 "Each point = one batch of calls (equal-weighted, 2-week hold, "
                 "graded at close). The gap between the lines IS the system's "
@@ -424,6 +424,9 @@ def swing_page():
                     except: return ""
                 st.dataframe(
                     show.sort_values("Date", ascending=False).style
+                        .format({"Entry": "₹{:,.2f}", "Target": "₹{:,.2f}",
+                                 "Stop": "₹{:,.2f}", "Exit": "₹{:,.2f}",
+                                 "Return": "{:+.2f}", "Market": "{:+.2f}"})
                         .map(_out, subset=["Outcome"])
                         .map(_ret, subset=["Return", "Market"]),
                     width="stretch", hide_index=True, height=320,
@@ -477,10 +480,10 @@ def swing_page():
                 f"**Score {b}** → {s['win_rate']:.0%} win · "
                 f"{s['avg_ret']:+.1%} avg (n={s['n']})")
         st.markdown(
-            f"🧠 **Learned from {learn['n']} graded calls** — historical odds by "
+            f"**Learned from {learn['n']} graded calls** — historical odds by "
             f"score bucket:&nbsp;&nbsp;" + " &nbsp;·&nbsp; ".join(bucket_bits))
         st.caption(
-            "『Hist Win %』and『Hist Avg %』beside each signal are the smoothed "
+            "'Hist Win %' and 'Hist Avg %' beside each signal are the smoothed "
             "outcomes of past calls in the same score bucket — they update "
             "automatically every time the weekly loop grades more calls.")
 
@@ -526,7 +529,7 @@ def swing_page():
             return ""
 
     st.markdown("#### Live signals — today's setups")
-    st.caption("💡 Click any column header to sort (click again to reverse) — like Excel.")
+    st.caption("Click any column header to sort (click again to reverse) — like Excel.")
     pct_cols = [c for c in ["vs 20DMA (%)", "vs 50DMA (%)", "Upside (%)",
                             "Hist Avg (%)"] if c in COLS]
     styled = (filtered[COLS].style
@@ -635,6 +638,9 @@ def stock_detail_page():
                 except (ValueError, TypeError): return ""
             st.dataframe(
                 hshow.sort_values("Date", ascending=False).style
+                     .format({"Entry": "₹{:,.2f}", "Target": "₹{:,.2f}",
+                              "Stop": "₹{:,.2f}", "Exit": "₹{:,.2f}",
+                              "Return": "{:+.2f}"})
                      .map(_o, subset=["Outcome"]).map(_r, subset=["Return"]),
                 width="stretch", hide_index=True,
                 height=min(320, 60 + 35 * len(hshow)),

@@ -20,415 +20,191 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── Background animation (portfolio canvas engine, injected into parent) ─────
-st.iframe("""<!DOCTYPE html><html><head><style>body{margin:0;background:transparent}</style></head><body><script>
-(function(){
-  try{
-    var W=window.parent,doc=W.document;
-    if(doc.getElementById('at-cv'))return;
-
-    // canvas
-    var cv=doc.createElement('canvas');
-    cv.id='at-cv';
-    cv.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;';
-    doc.body.insertBefore(cv,doc.body.firstChild);
-    var ctx=cv.getContext('2d');
-
-    // spotlight
-    var sp=doc.createElement('div');
-    sp.id='at-sp';
-    sp.style.cssText='position:fixed;top:0;left:0;width:700px;height:700px;border-radius:50%;pointer-events:none;z-index:1;opacity:0;transition:opacity .5s;background:radial-gradient(circle,rgba(74,222,128,.06) 0%,transparent 65%);';
-    doc.body.insertBefore(sp,cv.nextSibling);
-
-    var Ww=W.innerWidth,Wh=W.innerHeight;
-    var mouse={x:-9999,y:-9999},spos={x:0,y:0},sinit=false;
-
-    function resize(){Ww=W.innerWidth;Wh=W.innerHeight;cv.width=Ww;cv.height=Wh;}
-    resize();
-
-    // stars (twinkling, 3 depths — exact portfolio logic)
-    var stars=[];
-    function mkStars(){
-      stars=[];
-      var n=Math.max(90,Math.min(220,Math.floor(Ww*Wh/9000)));
-      for(var i=0;i<n;i++){
-        var depth=Math.random(),roll=Math.random();
-        stars.push({x:Math.random()*Ww,y:Math.random()*Wh,r:.4+depth*1.1,depth:depth,
-          phase:Math.random()*Math.PI*2,speed:.4+Math.random()*1.4,base:.12+depth*.5,
-          hue:roll<.78?0:roll<.9?1:2});
-      }
-    }
-    mkStars();
-
-    // constellation particles
-    var pts=[];
-    function mkPts(){
-      pts=[];
-      var n=Math.max(36,Math.min(80,Math.floor(Ww*Wh/26000)));
-      for(var i=0;i<n;i++) pts.push({x:Math.random()*Ww,y:Math.random()*Wh,vx:(Math.random()-.5)*.34,vy:(Math.random()-.5)*.34,r:Math.random()*1.4+.6});
-    }
-    mkPts();
-
-    // candlestick drifters (instead of shooting stars)
-    var cks=[];
-    function mkCks(){
-      cks=[];
-      for(var i=0;i<28;i++) cks.push({x:Math.random()*Ww,y:Math.random()*Wh,bh:8+Math.random()*22,wh:4+Math.random()*14,sp:.08+Math.random()*.2,bull:Math.random()>.32,a:.04+Math.random()*.05});
-    }
-    mkCks();
-
-    var LINK=130,t=0;
-
-    function starColor(hue,a){
-      if(hue===1)return'rgba(74,222,128,'+a+')';
-      if(hue===2)return'rgba(96,165,250,'+a+')';
-      return'rgba(226,232,240,'+a+')';
-    }
-
-    function frame(){
-      t+=.016;
-      ctx.clearRect(0,0,Ww,Wh);
-
-      // stars
-      for(var i=0;i<stars.length;i++){
-        var s=stars[i];
-        var tw=.55+.45*Math.sin(t*s.speed+s.phase);
-        var a=s.base*tw;
-        s.y+=.012+s.depth*.03; if(s.y>Wh+4)s.y=-4;
-        ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
-        ctx.fillStyle=starColor(s.hue,a);ctx.fill();
-        if(s.depth>.82&&tw>.92){
-          var len=s.r*5*(tw-.9)*10;
-          ctx.strokeStyle=starColor(s.hue,a*.5);ctx.lineWidth=.6;
-          ctx.beginPath();ctx.moveTo(s.x-len,s.y);ctx.lineTo(s.x+len,s.y);
-          ctx.moveTo(s.x,s.y-len);ctx.lineTo(s.x,s.y+len);ctx.stroke();
-        }
-      }
-
-      // rising candlesticks
-      for(var i=0;i<cks.length;i++){
-        var c=cks[i];
-        var col=c.bull?'rgba(74,222,128,'+c.a+')':'rgba(239,68,68,'+(c.a*.4)+')';
-        ctx.strokeStyle=col;ctx.fillStyle=col;ctx.lineWidth=1;
-        ctx.beginPath();ctx.moveTo(c.x,c.y-c.bh/2-c.wh);ctx.lineTo(c.x,c.y+c.bh/2+c.wh/2);ctx.stroke();
-        ctx.fillRect(c.x-3,c.y-c.bh/2,6,c.bh);
-        c.y-=c.sp;
-        if(c.y+c.bh+c.wh<0){c.y=Wh+30;c.x=Math.random()*Ww;c.bull=Math.random()>.32;c.bh=8+Math.random()*22;}
-      }
-
-      // particles
-      for(var i=0;i<pts.length;i++){
-        var p=pts[i];
-        p.x+=p.vx;p.y+=p.vy;p.vx*=.995;p.vy*=.995;
-        if(p.x<-10)p.x=Ww+10;if(p.x>Ww+10)p.x=-10;
-        if(p.y<-10)p.y=Wh+10;if(p.y>Wh+10)p.y=-10;
-        ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
-        ctx.fillStyle='rgba(74,222,128,.28)';ctx.fill();
-      }
-
-      // links between particles
-      for(var i=0;i<pts.length;i++) for(var j=i+1;j<pts.length;j++){
-        var dx=pts[i].x-pts[j].x,dy=pts[i].y-pts[j].y,d=Math.sqrt(dx*dx+dy*dy);
-        if(d<LINK){ctx.beginPath();ctx.moveTo(pts[i].x,pts[i].y);ctx.lineTo(pts[j].x,pts[j].y);ctx.strokeStyle='rgba(74,222,128,'+((1-d/LINK)*.09)+')';ctx.lineWidth=1;ctx.stroke();}
-      }
-
-      // mouse links
-      for(var i=0;i<pts.length;i++){
-        var dx=pts[i].x-mouse.x,dy=pts[i].y-mouse.y,d=Math.sqrt(dx*dx+dy*dy);
-        if(d<170){ctx.beginPath();ctx.moveTo(pts[i].x,pts[i].y);ctx.lineTo(mouse.x,mouse.y);ctx.strokeStyle='rgba(74,222,128,'+((1-d/170)*.2)+')';ctx.lineWidth=1;ctx.stroke();}
-      }
-
-      // spotlight lerp
-      if(sinit){
-        spos.x+=(mouse.x-spos.x)*.08;spos.y+=(mouse.y-spos.y)*.08;
-        sp.style.transform='translate3d('+(spos.x-350)+'px,'+(spos.y-350)+'px,0)';
-      }
-
-      W.requestAnimationFrame(frame);
-    }
-
-    doc.addEventListener('mousemove',function(e){
-      mouse.x=e.clientX;mouse.y=e.clientY;
-      if(!sinit){spos.x=mouse.x;spos.y=mouse.y;sinit=true;}
-      sp.style.opacity='1';
-    });
-    doc.addEventListener('mouseleave',function(){sp.style.opacity='0';});
-    W.addEventListener('resize',function(){resize();mkStars();mkPts();mkCks();});
-
-    frame();
-  }catch(e){console.warn('AT BG:',e);}
-})();
-</script></body></html>""", height=1)
-
-# ── Global CSS theme ──────────────────────────────────────────────────────────
+# ── Global CSS theme: dark fintech ────────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 
-/* ── Base: dark background on body only ── */
-html, body {
-    background: #0a0a0a !important;
+/* ══════════ DARK FINTECH THEME ══════════
+   page #111418 · sidebar #0c0f12 · cards #171c22 · accent #00c853
+   text #eef2f6 / #8a95a1 / #5c6672 · negative #ff5252 · warn #ffb300 */
+
+html, body, [data-testid="stAppViewContainer"], .stApp {
+    background: #111418 !important;
     font-family: 'Inter', system-ui, sans-serif !important;
-    color: #e5e5e5 !important;
+    color: #eef2f6 !important;
 }
+[data-testid="stMainBlockContainer"], .main, .block-container,
+[data-testid="stVerticalBlock"] { background: transparent !important; }
 
-/* Make all Streamlit containers transparent so background shows through */
-[data-testid="stApp"], .stApp,
-[data-testid="stMainBlockContainer"],
-[data-testid="stAppViewContainer"],
-[data-testid="stVerticalBlock"],
-.main, .block-container,
-section.main > div { background: transparent !important; }
-
-/* ── Animated nebula (on body, z-index: -1 so it's behind everything) ── */
-body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background:
-        radial-gradient(circle at 15% 25%, rgba(74,222,128,.09) 0%, transparent 45%),
-        radial-gradient(circle at 85% 70%, rgba(74,222,128,.06) 0%, transparent 45%),
-        radial-gradient(circle at 50% 90%, rgba(96,165,250,.04) 0%, transparent 40%);
-    animation: nebula-drift 28s ease-in-out infinite alternate;
-    pointer-events: none;
-    z-index: -1;
-}
-@keyframes nebula-drift {
-    0%   { opacity:1; transform: scale(1)    translate(0,0); }
-    50%  { opacity:.75; transform: scale(1.07) translate(3%,2%); }
-    100% { opacity:1; transform: scale(1)    translate(-2%,-1%); }
-}
-/* ── Dot grid (on body, z-index: -1) ── */
-body::after {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image: radial-gradient(rgba(74,222,128,.07) 1px, transparent 1px);
-    background-size: 30px 30px;
-    mask-image: radial-gradient(ellipse 90% 70% at 50% 40%, #000 30%, transparent 100%);
-    -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 40%, #000 30%, transparent 100%);
-    pointer-events: none;
-    z-index: -1;
-}
 [data-testid="stHeader"],
 [data-testid="stToolbar"],
 [data-testid="stDecoration"],
 [data-testid="stStatusWidget"] { display: none !important; }
 
-/* Main padding */
 [data-testid="stMainBlockContainer"],
 .main .block-container {
-    padding: 1.5rem 2rem 2rem 2rem !important;
+    padding: 1.6rem 2.2rem 2.2rem 2.2rem !important;
     max-width: 100% !important;
 }
 
 /* ── Sidebar ── */
 [data-testid="stSidebar"] {
-    background: #0d0d0d !important;
-    border-right: 1px solid rgba(74,222,128,.12) !important;
-    padding-top: 0 !important;
+    background: #0c0f12 !important;
+    border-right: 1px solid #1e242b !important;
 }
-[data-testid="stSidebar"] > div:first-child { padding: 1.5rem 1rem !important; }
-[data-testid="stSidebarContent"] { padding: 0 !important; }
+[data-testid="stSidebar"] > div:first-child { padding: 1.4rem 0.9rem !important; }
 
-/* Sidebar nav (radio) */
+/* nav items: quiet grey → green pill when active (fintech style) */
 [data-testid="stSidebar"] .stRadio > label { display: none !important; }
 [data-testid="stSidebar"] .stRadio > div { gap: 2px !important; flex-direction: column !important; }
 [data-testid="stSidebar"] .stRadio > div > label {
-    padding: 11px 16px !important;
+    padding: 9px 12px !important;
     border-radius: 8px !important;
-    border-left: 2px solid transparent !important;
-    color: #6b7280 !important;
-    font-size: 14px !important;
+    color: #8a95a1 !important;
+    font-size: 13.5px !important;
     cursor: pointer !important;
-    transition: all .15s ease !important;
+    transition: background .15s ease, color .15s ease !important;
     margin: 1px 0 !important;
-    font-family: 'Inter', system-ui, sans-serif !important;
 }
 [data-testid="stSidebar"] .stRadio > div > label:hover {
-    background: rgba(74,222,128,.07) !important;
-    color: #4ade80 !important;
-    border-left-color: rgba(74,222,128,.35) !important;
+    background: #171c22 !important;
+    color: #c6ced6 !important;
 }
 [data-testid="stSidebar"] .stRadio > div > label:has(input:checked) {
-    background: rgba(74,222,128,.1) !important;
-    color: #4ade80 !important;
-    border-left-color: #4ade80 !important;
-    font-weight: 600 !important;
+    background: rgba(0,200,83,.10) !important;
+    color: #00c853 !important;
+    font-weight: 500 !important;
 }
 [data-testid="stSidebar"] .stRadio > div > label > div:first-child { display: none !important; }
+[data-testid="stSidebar"] hr { border-color: #1e242b !important; }
 
-/* ── Metrics ── */
+/* ── Metric cards: flat, borderless, calm ── */
 [data-testid="metric-container"] {
-    background: rgba(255,255,255,.02) !important;
-    border: 1px solid rgba(74,222,128,.12) !important;
-    border-radius: 12px !important;
-    padding: 1rem 1.2rem !important;
-}
-[data-testid="stMetricLabel"] p {
-    color: #6b7280 !important;
-    font-size: 11px !important;
-    text-transform: uppercase !important;
-    letter-spacing: .6px !important;
-}
-[data-testid="stMetricValue"] { color: #e5e5e5 !important; font-weight: 700 !important; }
-[data-testid="stMetricDeltaIcon-Up"] { color: #4ade80 !important; }
-[data-testid="stMetricDeltaIcon-Down"] { color: #ef4444 !important; }
-
-/* ── Dataframe ── */
-.stDataFrame iframe, .stDataFrame > div {
-    border: 1px solid rgba(74,222,128,.1) !important;
+    background: #171c22 !important;
+    border: none !important;
     border-radius: 10px !important;
-    overflow: hidden !important;
-    background: rgba(255,255,255,.015) !important;
-}
-
-/* ── Inputs ── */
-.stSelectbox > div > div, .stMultiSelect > div > div {
-    background: rgba(255,255,255,.03) !important;
-    border-color: rgba(74,222,128,.2) !important;
-    border-radius: 8px !important;
-    color: #e5e5e5 !important;
-}
-.stTextArea > div > div > textarea {
-    background: rgba(255,255,255,.03) !important;
-    border-color: rgba(74,222,128,.2) !important;
-    border-radius: 8px !important;
-    color: #e5e5e5 !important;
-    font-family: 'Inter', monospace !important;
-}
-
-/* ── Divider / HR ── */
-hr { border-color: rgba(74,222,128,.1) !important; }
-
-/* ── Text ── */
-h1,h2,h3,h4 { color: #e5e5e5 !important; font-family: 'Inter', system-ui, sans-serif !important; }
-.stMarkdown p, .stCaption { color: #6b7280 !important; }
-[data-testid="stCaptionContainer"] p { color: #4b5563 !important; font-size: 12px !important; }
-
-/* ── Spinner ── */
-.stSpinner > div { border-top-color: #4ade80 !important; }
-
-/* ── Plotly ── */
-.js-plotly-plot .plotly { background: transparent !important; }
-
-/* ═══════════ MOTION & POLISH LAYER ═══════════ */
-@keyframes fadeSlideUp {
-    from { opacity: 0; transform: translateY(14px); }
-    to   { opacity: 1; transform: translateY(0); }
-}
-@keyframes titleSheen {
-    0%, 100% { background-position: 0% 50%; }
-    50%      { background-position: 100% 50%; }
-}
-
-/* page content enters with a soft rise (transform/opacity only = cheap) */
-.main .block-container, [data-testid="stMainBlockContainer"] {
-    animation: fadeSlideUp .45s cubic-bezier(.22,.9,.36,1) both;
-}
-/* gentle stagger on the first few top-level blocks */
-[data-testid="stMainBlockContainer"] > div > div:nth-child(1) { animation: fadeSlideUp .4s .02s both; }
-[data-testid="stMainBlockContainer"] > div > div:nth-child(2) { animation: fadeSlideUp .4s .08s both; }
-[data-testid="stMainBlockContainer"] > div > div:nth-child(3) { animation: fadeSlideUp .4s .14s both; }
-[data-testid="stMainBlockContainer"] > div > div:nth-child(4) { animation: fadeSlideUp .4s .20s both; }
-
-/* headings get a living gradient */
-.main h2 {
-    background: linear-gradient(110deg, #e5e5e5 30%, #4ade80 50%, #e5e5e5 70%);
-    background-size: 200% auto;
-    -webkit-background-clip: text; background-clip: text;
-    -webkit-text-fill-color: transparent;
-    animation: titleSheen 6s ease-in-out infinite;
-}
-
-/* metric cards: lift + glow on hover, gradient hairline on top */
-[data-testid="metric-container"] {
-    position: relative !important;
-    transition: transform .22s ease, border-color .22s ease, box-shadow .22s ease !important;
-    overflow: hidden !important;
-}
-[data-testid="metric-container"]::before {
-    content: '';
-    position: absolute; top: 0; left: 0; right: 0; height: 2px;
-    background: linear-gradient(90deg, transparent, rgba(74,222,128,.55), transparent);
-    opacity: 0; transition: opacity .25s ease;
+    padding: 0.9rem 1.1rem !important;
+    transition: background .18s ease, transform .18s ease !important;
 }
 [data-testid="metric-container"]:hover {
-    transform: translateY(-3px) !important;
-    border-color: rgba(74,222,128,.4) !important;
-    box-shadow: 0 8px 28px rgba(74,222,128,.10), 0 2px 8px rgba(0,0,0,.4) !important;
+    background: #1a2028 !important;
+    transform: translateY(-2px) !important;
 }
-[data-testid="metric-container"]:hover::before { opacity: 1; }
+[data-testid="stMetricLabel"] p {
+    color: #8a95a1 !important;
+    font-size: 11.5px !important;
+    letter-spacing: .2px !important;
+}
+[data-testid="stMetricValue"] {
+    color: #eef2f6 !important;
+    font-weight: 600 !important;
+    font-family: 'Inter', sans-serif !important;
+}
+[data-testid="stMetricDeltaIcon-Up"] { color: #00c853 !important; }
+[data-testid="stMetricDeltaIcon-Down"] { color: #ff5252 !important; }
 
-/* dataframes glow softly on hover */
-.stDataFrame { transition: box-shadow .25s ease !important; border-radius: 10px !important; }
-.stDataFrame:hover { box-shadow: 0 0 0 1px rgba(74,222,128,.25), 0 10px 32px rgba(0,0,0,.35) !important; }
-
-/* expanders: rounded card look with animated border */
-[data-testid="stExpander"] {
-    border: 1px solid rgba(74,222,128,.14) !important;
-    border-radius: 12px !important;
-    background: rgba(255,255,255,.015) !important;
-    transition: border-color .25s ease, box-shadow .25s ease !important;
+/* ── Dataframes: flat card, no glow ── */
+.stDataFrame > div, .stDataFrame iframe {
+    border: none !important;
+    border-radius: 10px !important;
     overflow: hidden !important;
+    background: #171c22 !important;
 }
-[data-testid="stExpander"]:hover {
-    border-color: rgba(74,222,128,.35) !important;
-    box-shadow: 0 4px 18px rgba(74,222,128,.06) !important;
-}
-[data-testid="stExpander"] summary {
-    color: #9ca3af !important;
-    transition: color .2s ease !important;
-}
-[data-testid="stExpander"] summary:hover { color: #4ade80 !important; }
+.stDataFrame { border-radius: 10px !important; }
 
-/* number inputs match the theme */
+/* ── Inputs ── */
+.stSelectbox > div > div, .stMultiSelect > div > div,
 .stNumberInput > div > div {
-    background: rgba(255,255,255,.03) !important;
-    border-color: rgba(74,222,128,.2) !important;
+    background: #171c22 !important;
+    border: 1px solid #232a32 !important;
     border-radius: 8px !important;
+    color: #eef2f6 !important;
 }
-.stNumberInput input { color: #e5e5e5 !important; }
-.stNumberInput button { background: rgba(74,222,128,.08) !important; color: #4ade80 !important; }
-
-/* buttons: green ghost that fills on hover */
-.stButton > button, .stDownloadButton > button {
-    background: rgba(74,222,128,.08) !important;
-    color: #4ade80 !important;
-    border: 1px solid rgba(74,222,128,.35) !important;
+.stNumberInput input, .stSelectbox input { color: #eef2f6 !important; }
+.stNumberInput button { background: #1e242b !important; color: #8a95a1 !important; }
+.stTextArea > div > div > textarea {
+    background: #171c22 !important;
+    border: 1px solid #232a32 !important;
     border-radius: 8px !important;
-    transition: all .2s ease !important;
+    color: #eef2f6 !important;
+}
+.stMultiSelect [data-baseweb="tag"] {
+    background: rgba(0,200,83,.10) !important;
+    color: #00c853 !important;
+    border-radius: 999px !important;
+}
+.stMultiSelect [data-baseweb="tag"] span { color: #00c853 !important; }
+
+/* ── Buttons: quiet outline, green on hover ── */
+.stButton > button, .stDownloadButton > button {
+    background: #171c22 !important;
+    color: #c6ced6 !important;
+    border: 1px solid #232a32 !important;
+    border-radius: 8px !important;
+    transition: all .18s ease !important;
 }
 .stButton > button:hover, .stDownloadButton > button:hover {
-    background: rgba(74,222,128,.18) !important;
-    border-color: #4ade80 !important;
-    transform: translateY(-1px) !important;
-    box-shadow: 0 4px 16px rgba(74,222,128,.18) !important;
+    border-color: #00c853 !important;
+    color: #00c853 !important;
+    background: rgba(0,200,83,.06) !important;
 }
 
-/* sidebar nav: soft glow behind the active item */
-[data-testid="stSidebar"] .stRadio > div > label:has(input:checked) {
-    box-shadow: inset 0 0 18px rgba(74,222,128,.06), 0 0 12px rgba(74,222,128,.08) !important;
-}
-
-/* alerts/info boxes on-theme */
-.stAlert {
-    background: rgba(74,222,128,.05) !important;
-    border: 1px solid rgba(74,222,128,.2) !important;
+/* ── Expanders: flat card ── */
+[data-testid="stExpander"] {
+    border: none !important;
     border-radius: 10px !important;
-    color: #d1d5db !important;
+    background: #171c22 !important;
+    overflow: hidden !important;
+}
+[data-testid="stExpander"] summary {
+    color: #8a95a1 !important;
+    transition: color .15s ease !important;
+}
+[data-testid="stExpander"] summary:hover { color: #00c853 !important; }
+
+/* ── Text ── */
+h1,h2,h3,h4 {
+    color: #eef2f6 !important;
+    font-family: 'Inter', sans-serif !important;
+    font-weight: 600 !important;
+    letter-spacing: -.2px !important;
+}
+.stMarkdown p { color: #c6ced6 !important; }
+.stCaption, [data-testid="stCaptionContainer"] p {
+    color: #5c6672 !important;
+    font-size: 12px !important;
+}
+hr { border-color: #1e242b !important; }
+.stSpinner > div { border-top-color: #00c853 !important; }
+.js-plotly-plot .plotly { background: transparent !important; }
+
+/* ── Alerts ── */
+.stAlert {
+    background: #171c22 !important;
+    border: 1px solid #232a32 !important;
+    border-radius: 10px !important;
+    color: #c6ced6 !important;
 }
 
-/* slim dark scrollbar with green thumb */
-::-webkit-scrollbar { width: 9px; height: 9px; }
-::-webkit-scrollbar-track { background: #0a0a0a; }
-::-webkit-scrollbar-thumb {
-    background: rgba(74,222,128,.22);
-    border-radius: 5px;
+/* ── Motion: one soft entrance, nothing looping ── */
+@keyframes riseIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
-::-webkit-scrollbar-thumb:hover { background: rgba(74,222,128,.45); }
+[data-testid="stMainBlockContainer"] > div > div:nth-child(-n+5) {
+    animation: riseIn .35s cubic-bezier(.22,.9,.36,1) both;
+}
+[data-testid="stMainBlockContainer"] > div > div:nth-child(2) { animation-delay: .05s; }
+[data-testid="stMainBlockContainer"] > div > div:nth-child(3) { animation-delay: .10s; }
+[data-testid="stMainBlockContainer"] > div > div:nth-child(4) { animation-delay: .15s; }
 
-/* respect users who turn motion off */
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #111418; }
+::-webkit-scrollbar-thumb { background: #2a323c; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #3a444f; }
+
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }
 }
@@ -438,10 +214,14 @@ h1,h2,h3,h4 { color: #e5e5e5 !important; font-family: 'Inter', system-ui, sans-s
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("""
-    <div style="padding:0 4px 16px 4px;">
-      <div style="font-size:28px;margin-bottom:4px;">📈</div>
-      <div style="font-size:18px;font-weight:700;color:#e5e5e5;letter-spacing:-.3px;">My AI Trader</div>
-      <div style="font-size:11px;color:#4b5563;margin-top:2px;">Nifty 500 · NSE Bhavcopy</div>
+    <div style="display:flex;align-items:center;gap:10px;padding:2px 4px 14px 4px;">
+      <div style="width:34px;height:34px;border-radius:9px;background:#00c853;display:flex;
+                  align-items:center;justify-content:center;color:#04240f;
+                  font-weight:600;font-size:14px;flex-shrink:0;">AT</div>
+      <div>
+        <div style="font-size:15px;font-weight:600;color:#eef2f6;letter-spacing:-.2px;">AI Trader</div>
+        <div style="font-size:10.5px;color:#5c6672;margin-top:1px;">NSE · Nifty 500</div>
+      </div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -456,7 +236,7 @@ with st.sidebar:
 
     st.divider()
     st.markdown(f"""
-    <div style="font-size:11px;color:#4b5563;line-height:1.8;">
+    <div style="font-size:11px;color:#5c6672;line-height:1.8;">
       🕐 {datetime.now().strftime('%d %b %Y, %I:%M %p')}<br>
       ⚡ Data refreshes hourly
     </div>
@@ -505,7 +285,7 @@ if page == "📊  Overview":
             top10.columns = ["Symbol", "Week (%)"]
             top10["Week (%)"] = top10["Week (%)"].round(2)
             st.dataframe(
-                top10.style.map(lambda v: "color:#4ade80;font-weight:600", subset=["Week (%)"]),
+                top10.style.map(lambda v: "color:#00c853;font-weight:600", subset=["Week (%)"]),
                 width="stretch", hide_index=True,
             )
 
@@ -515,7 +295,7 @@ if page == "📊  Overview":
             bot10.columns = ["Symbol", "Week (%)"]
             bot10["Week (%)"] = bot10["Week (%)"].round(2)
             st.dataframe(
-                bot10.style.map(lambda v: "color:#ef4444;font-weight:600", subset=["Week (%)"]),
+                bot10.style.map(lambda v: "color:#ff5252;font-weight:600", subset=["Week (%)"]),
                 width="stretch", hide_index=True,
             )
 
@@ -559,14 +339,14 @@ elif page == "🎯  Swing Signals":
             fig_eq.add_trace(go.Scatter(
                 x=list(cohort.index), y=(eq_mkt * 100).round(2),
                 name="Market (equal-weight N500)", mode="lines",
-                line=dict(color="#6b7280", width=1.6, dash="dot"),
+                line=dict(color="#8a95a1", width=1.6, dash="dot"),
                 hovertemplate="%{x}<br>Market: %{y:.2f}%<extra></extra>"))
             fig_eq.add_trace(go.Scatter(
                 x=list(cohort.index), y=(eq_sys * 100).round(2),
                 name="System calls (equal-weight)", mode="lines+markers",
-                line=dict(color="#4ade80", width=2.6, shape="spline"),
+                line=dict(color="#00c853", width=2.6, shape="spline"),
                 marker=dict(size=6),
-                fill="tonexty", fillcolor="rgba(74,222,128,.06)",
+                fill="tonexty", fillcolor="rgba(0,200,83,.06)",
                 customdata=cohort["n"],
                 hovertemplate="%{x}<br>System: %{y:.2f}%<br>calls in cohort: "
                               "%{customdata}<extra></extra>"))
@@ -575,14 +355,14 @@ elif page == "🎯  Swing Signals":
                 paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
                 height=300, margin=dict(l=10, r=10, t=36, b=10),
                 title=dict(text="Compounded return — every call taken vs the market",
-                           font=dict(size=13, color="#9ca3af")),
+                           font=dict(size=13, color="#8a95a1")),
                 legend=dict(orientation="h", y=1.14, x=0,
-                            font=dict(size=11, color="#9ca3af"),
+                            font=dict(size=11, color="#8a95a1"),
                             bgcolor="rgba(0,0,0,0)"),
                 xaxis=dict(gridcolor="rgba(255,255,255,.05)", title=None),
                 yaxis=dict(gridcolor="rgba(255,255,255,.05)",
                            ticksuffix="%", title=None),
-                hoverlabel=dict(bgcolor="#111", font=dict(color="#e5e5e5")),
+                hoverlabel=dict(bgcolor="#111", font=dict(color="#eef2f6")),
             )
             st.plotly_chart(fig_eq, width="stretch",
                             config={"displayModeBar": False})
@@ -607,11 +387,11 @@ elif page == "🎯  Swing Signals":
                 show["Market"] = (show["Market"].astype(float) * 100).round(2)
 
                 def _out(v):
-                    return ("color:#22c55e;font-weight:700" if v == "TARGET"
-                            else "color:#ef4444;font-weight:600" if v == "STOP"
-                            else "color:#9ca3af")
+                    return ("color:#00c853;font-weight:700" if v == "TARGET"
+                            else "color:#ff5252;font-weight:600" if v == "STOP"
+                            else "color:#8a95a1")
                 def _ret(v):
-                    try: return f"color:{'#4ade80' if float(v) >= 0 else '#ef4444'}"
+                    try: return f"color:{'#00c853' if float(v) >= 0 else '#ff5252'}"
                     except: return ""
                 st.dataframe(
                     show.sort_values("Date", ascending=False).style
@@ -682,15 +462,15 @@ elif page == "🎯  Swing Signals":
     COLS = [c for c in COLS if c in filtered.columns]
 
     def _sig(v):
-        if "Strong" in str(v): return "color:#22c55e;font-weight:700"
-        if "Buy" in str(v):    return "color:#4ade80;font-weight:600"
-        if "Overbought" in str(v): return "color:#ef4444;font-weight:600"
-        if "Watch" in str(v):  return "color:#fbbf24;font-weight:600"
-        return "color:#6b7280"
+        if "Strong" in str(v): return "color:#00c853;font-weight:700"
+        if "Buy" in str(v):    return "color:#00c853;font-weight:600"
+        if "Overbought" in str(v): return "color:#ff5252;font-weight:600"
+        if "Watch" in str(v):  return "color:#ffb300;font-weight:600"
+        return "color:#8a95a1"
 
-    def _macd(v): return "color:#4ade80" if v == "Bullish" else "color:#ef4444"
+    def _macd(v): return "color:#00c853" if v == "Bullish" else "color:#ff5252"
     def _pct(v):
-        try: return f"color:{'#4ade80' if float(v)>=0 else '#ef4444'}"
+        try: return f"color:{'#00c853' if float(v)>=0 else '#ff5252'}"
         except: return ""
 
     # clean number formatting (display only — underlying stays numeric so
@@ -711,8 +491,8 @@ elif page == "🎯  Swing Signals":
 
     def _win(v):
         try:
-            return ("color:#4ade80;font-weight:600" if float(v) >= 50
-                    else "color:#f87171")
+            return ("color:#00c853;font-weight:600" if float(v) >= 50
+                    else "color:#ff5252")
         except (ValueError, TypeError):
             return ""
 
@@ -772,32 +552,32 @@ elif page == "🔍  Stock Detail":
             subplot_titles=(f"{sel} — Close Price", "RSI (14)", "MACD"),
         )
         fig.add_trace(go.Scatter(x=ohlcv["date"], y=ohlcv["close"], name="Close",
-            line=dict(color="#4ade80", width=2), fill="tozeroy", fillcolor="rgba(74,222,128,0.05)"), row=1, col=1)
+            line=dict(color="#00c853", width=2), fill="tozeroy", fillcolor="rgba(0,200,83,0.05)"), row=1, col=1)
         fig.add_trace(go.Scatter(x=ohlcv["date"], y=ohlcv["ma20"], name="20DMA",
-            line=dict(color="#fbbf24", width=1.5, dash="dash")), row=1, col=1)
+            line=dict(color="#ffb300", width=1.5, dash="dash")), row=1, col=1)
         fig.add_trace(go.Scatter(x=ohlcv["date"], y=ohlcv["ma50"], name="50DMA",
             line=dict(color="#60a5fa", width=1.5, dash="dot")), row=1, col=1)
         fig.add_trace(go.Scatter(x=ohlcv["date"], y=ohlcv["rsi"], name="RSI",
             line=dict(color="#a78bfa", width=1.5)), row=2, col=1)
-        fig.add_hline(y=70, line_dash="dot", line_color="#ef4444", opacity=0.5, row=2, col=1)
-        fig.add_hline(y=30, line_dash="dot", line_color="#4ade80", opacity=0.5, row=2, col=1)
-        bar_colors = ["#4ade80" if v >= 0 else "#ef4444" for v in ohlcv["macd_hist"].fillna(0)]
+        fig.add_hline(y=70, line_dash="dot", line_color="#ff5252", opacity=0.5, row=2, col=1)
+        fig.add_hline(y=30, line_dash="dot", line_color="#00c853", opacity=0.5, row=2, col=1)
+        bar_colors = ["#00c853" if v >= 0 else "#ff5252" for v in ohlcv["macd_hist"].fillna(0)]
         fig.add_trace(go.Bar(x=ohlcv["date"], y=ohlcv["macd_hist"], name="Histogram",
             marker_color=bar_colors, opacity=0.55), row=3, col=1)
         fig.add_trace(go.Scatter(x=ohlcv["date"], y=ohlcv["macd"], name="MACD",
-            line=dict(color="#4ade80", width=1.5)), row=3, col=1)
+            line=dict(color="#00c853", width=1.5)), row=3, col=1)
         fig.add_trace(go.Scatter(x=ohlcv["date"], y=ohlcv["macd_sig"], name="Signal",
-            line=dict(color="#fbbf24", width=1.5)), row=3, col=1)
+            line=dict(color="#ffb300", width=1.5)), row=3, col=1)
 
         fig.update_layout(
             paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-            font=dict(color="#9ca3af", family="Inter, system-ui"),
+            font=dict(color="#8a95a1", family="Inter, system-ui"),
             height=560, hovermode="x unified", showlegend=True,
-            legend=dict(orientation="h", y=1.04, x=0, bgcolor="rgba(0,0,0,0)", font_color="#9ca3af"),
+            legend=dict(orientation="h", y=1.04, x=0, bgcolor="rgba(0,0,0,0)", font_color="#8a95a1"),
             margin=dict(l=0, r=0, t=60, b=0),
         )
-        fig.update_xaxes(gridcolor="rgba(74,222,128,0.05)", zeroline=False, color="#6b7280")
-        fig.update_yaxes(gridcolor="rgba(74,222,128,0.05)", zeroline=False, color="#6b7280")
+        fig.update_xaxes(gridcolor="rgba(0,200,83,0.05)", zeroline=False, color="#8a95a1")
+        fig.update_yaxes(gridcolor="rgba(0,200,83,0.05)", zeroline=False, color="#8a95a1")
         fig.update_yaxes(title_text="₹", row=1, col=1)
         fig.update_yaxes(title_text="RSI", row=2, col=1, range=[0, 100])
         st.plotly_chart(fig, width="stretch")
@@ -818,11 +598,11 @@ elif page == "🔍  Stock Detail":
             hshow["Return"] = (hshow["Return"] * 100).round(2)
 
             def _o(v):
-                return ("color:#22c55e;font-weight:700" if v == "TARGET"
-                        else "color:#ef4444;font-weight:600" if v == "STOP"
-                        else "color:#9ca3af")
+                return ("color:#00c853;font-weight:700" if v == "TARGET"
+                        else "color:#ff5252;font-weight:600" if v == "STOP"
+                        else "color:#8a95a1")
             def _r(v):
-                try: return f"color:{'#4ade80' if float(v) >= 0 else '#ef4444'}"
+                try: return f"color:{'#00c853' if float(v) >= 0 else '#ff5252'}"
                 except (ValueError, TypeError): return ""
             st.dataframe(
                 hshow.sort_values("Date", ascending=False).style
@@ -839,10 +619,10 @@ elif page == "💼  My Portfolio":
     col_inp, col_help = st.columns([3, 1])
     with col_help:
         st.markdown("""
-<div style="background:rgba(74,222,128,.06);border:1px solid rgba(74,222,128,.15);border-radius:10px;padding:14px 16px;font-size:13px;color:#9ca3af;line-height:1.8;">
-<b style="color:#4ade80;">Format</b><br>
+<div style="background:rgba(0,200,83,.06);border:1px solid rgba(0,200,83,.15);border-radius:10px;padding:14px 16px;font-size:13px;color:#8a95a1;line-height:1.8;">
+<b style="color:#00c853;">Format</b><br>
 <code>SYMBOL, Qty, Buy Price</code><br><br>
-<b style="color:#6b7280;">Example</b><br>
+<b style="color:#8a95a1;">Example</b><br>
 <code>NIACL, 50, 152.80</code><br>
 <code>HFCL, 100, 171.86</code><br>
 <code>TRENT, 5, 2755.30</code>
@@ -887,7 +667,7 @@ elif page == "💼  My Portfolio":
             s3.metric("Overall P&L",    f"₹{tp:+,.0f}", f"{tpct:+.2f}%")
 
             def _pnl(v):
-                try: return f"color:{'#4ade80' if float(v)>=0 else '#ef4444'};font-weight:600"
+                try: return f"color:{'#00c853' if float(v)>=0 else '#ff5252'};font-weight:600"
                 except: return ""
 
             st.dataframe(
@@ -911,8 +691,8 @@ elif page == "🤖  AI Lab — Defence":
 
     # ── honest framing ──
     st.markdown("""
-<div style="background:rgba(96,165,250,.06);border:1px solid rgba(96,165,250,.2);border-radius:10px;padding:12px 16px;font-size:12.5px;color:#9ca3af;line-height:1.7;margin-bottom:18px;">
-<b style="color:#60a5fa;">How to read this:</b> the model ranks defence stocks by probability of an <b>up</b> day tomorrow.
+<div style="background:#171c22;border-left:3px solid #00c853;border-radius:0 10px 10px 0;padding:12px 16px;font-size:12.5px;color:#8a95a1;line-height:1.7;margin-bottom:18px;">
+<b style="color:#00c853;">How to read this:</b> the model ranks defence stocks by probability of an <b>up</b> day tomorrow.
 It's a research aid, not a guarantee — out-of-sample edge is real but modest (AUC ≈ 0.56). Trust the <b>track record</b> below, not any single call.
 </div>
 """, unsafe_allow_html=True)
@@ -957,20 +737,20 @@ It's a research aid, not a guarantee — out-of-sample edge is real but modest (
         sym = p["symbol"]
         prob = p["proba"]
         bullish = prob >= 0.5
-        col = "#4ade80" if bullish else "#ef4444"
+        col = "#00c853" if bullish else "#ff5252"
         label = "Bullish" if bullish else "Bearish"
         name = DEFENCE_NAMES.get(sym, sym)
         rscore = rule_scores.get(sym)
-        rule_html = (f'<span style="font-size:12px;color:#9ca3af;">Rule score '
-                     f'<b style="color:#e5e5e5;">{rscore:.0f}</b>/100</span>'
+        rule_html = (f'<span style="font-size:12px;color:#8a95a1;">Rule score '
+                     f'<b style="color:#eef2f6;">{rscore:.0f}</b>/100</span>'
                      if rscore is not None else
-                     '<span style="font-size:12px;color:#4b5563;">Rule score —</span>')
+                     '<span style="font-size:12px;color:#5c6672;">Rule score —</span>')
 
         chips = ""
         for s in p["signals"]:
             pos = s["direction"] == "+"
-            c = "#4ade80" if pos else "#f87171"
-            bg = "rgba(74,222,128,.08)" if pos else "rgba(248,113,113,.08)"
+            c = "#00c853" if pos else "#ff5252"
+            bg = "rgba(0,200,83,.08)" if pos else "rgba(248,113,113,.08)"
             chips += (f'<span style="display:inline-block;background:{bg};border:1px solid {c}33;'
                       f'color:{c};border-radius:6px;padding:3px 10px;margin:3px 6px 3px 0;font-size:12px;">'
                       f'{s["direction"]} {s["label"]}</span>')
@@ -980,9 +760,9 @@ It's a research aid, not a guarantee — out-of-sample edge is real but modest (
             border-radius:10px;padding:14px 18px;margin-bottom:10px;">
   <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;">
     <div>
-      <span style="font-size:16px;font-weight:700;color:#e5e5e5;">{sym}</span>
-      <span style="font-size:12px;color:#6b7280;margin-left:8px;">{name}</span>
-      <span style="font-size:12px;color:#6b7280;margin-left:8px;">· ₹{p['close']:,.1f}</span>
+      <span style="font-size:16px;font-weight:700;color:#eef2f6;">{sym}</span>
+      <span style="font-size:12px;color:#8a95a1;margin-left:8px;">{name}</span>
+      <span style="font-size:12px;color:#8a95a1;margin-left:8px;">· ₹{p['close']:,.1f}</span>
     </div>
     <div style="text-align:right;">
       <span style="font-size:17px;font-weight:700;color:{col};">{label} {prob:.0%}</span><br>{rule_html}
@@ -1003,7 +783,7 @@ It's a research aid, not a guarantee — out-of-sample edge is real but modest (
         cdf["proba"] = cdf["proba"].astype(str)
         cdf["up_rate"] = (cdf["up_rate"] * 100).round(1)
         cfig = go.Figure(go.Bar(
-            x=cdf["proba"], y=cdf["up_rate"], marker_color="#4ade80",
+            x=cdf["proba"], y=cdf["up_rate"], marker_color="#00c853",
             text=[f"{v:.0f}%" for v in cdf["up_rate"]], textposition="outside",
         ))
         cfig.update_layout(
@@ -1024,7 +804,7 @@ elif page == "🧠  Feature Importance":
 
     imp = ai_data.importance()
     st.markdown("""
-<div style="background:rgba(74,222,128,.05);border:1px solid rgba(74,222,128,.15);border-radius:10px;padding:12px 16px;font-size:12.5px;color:#9ca3af;line-height:1.7;margin-bottom:16px;">
+<div style="background:rgba(0,200,83,.05);border:1px solid rgba(0,200,83,.15);border-radius:10px;padding:12px 16px;font-size:12.5px;color:#8a95a1;line-height:1.7;margin-bottom:16px;">
 This is where XGBoost shines — every feature's contribution is measurable. Bars show each signal's share of the model's
 splitting decisions. Per-stock <b>+/−</b> attributions live on the <b>AI Lab</b> page.
 </div>
@@ -1033,7 +813,7 @@ splitting decisions. Per-stock <b>+/−</b> attributions live on the <b>AI Lab</
     top = imp.head(18).iloc[::-1]
     fig = go.Figure(go.Bar(
         x=top["importance"], y=top["label"], orientation="h",
-        marker=dict(color=top["importance"], colorscale=[[0, "#1f3d2b"], [1, "#4ade80"]]),
+        marker=dict(color=top["importance"], colorscale=[[0, "#1f3d2b"], [1, "#00c853"]]),
     ))
     fig.update_layout(
         template="plotly_dark", height=560, paper_bgcolor="rgba(0,0,0,0)",

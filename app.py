@@ -544,6 +544,54 @@ elif page == "🎯  Swing Signals":
                   help="Average 2-week return of the calls vs an equal-weight Nifty-500 baseline.")
         c4.metric("Stopped out", f"{rec['stop_rate']:.0%}")
 
+        # ── equity curve: what following every call would have compounded to ──
+        val = ai_data.swing_validated()
+        if len(val) >= 20:
+            cohort = (val.groupby("made_on")
+                      .agg(sys_ret=("realised_ret", "mean"),
+                           mkt_ret=("market_ret", "mean"),
+                           n=("symbol", "size"))
+                      .sort_index())
+            eq_sys = (1 + cohort["sys_ret"]).cumprod() - 1
+            eq_mkt = (1 + cohort["mkt_ret"]).cumprod() - 1
+
+            fig_eq = go.Figure()
+            fig_eq.add_trace(go.Scatter(
+                x=list(cohort.index), y=(eq_mkt * 100).round(2),
+                name="Market (equal-weight N500)", mode="lines",
+                line=dict(color="#6b7280", width=1.6, dash="dot"),
+                hovertemplate="%{x}<br>Market: %{y:.2f}%<extra></extra>"))
+            fig_eq.add_trace(go.Scatter(
+                x=list(cohort.index), y=(eq_sys * 100).round(2),
+                name="System calls (equal-weight)", mode="lines+markers",
+                line=dict(color="#4ade80", width=2.6, shape="spline"),
+                marker=dict(size=6),
+                fill="tonexty", fillcolor="rgba(74,222,128,.06)",
+                customdata=cohort["n"],
+                hovertemplate="%{x}<br>System: %{y:.2f}%<br>calls in cohort: "
+                              "%{customdata}<extra></extra>"))
+            fig_eq.update_layout(
+                template="plotly_dark",
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+                height=300, margin=dict(l=10, r=10, t=36, b=10),
+                title=dict(text="Compounded return — every call taken vs the market",
+                           font=dict(size=13, color="#9ca3af")),
+                legend=dict(orientation="h", y=1.14, x=0,
+                            font=dict(size=11, color="#9ca3af"),
+                            bgcolor="rgba(0,0,0,0)"),
+                xaxis=dict(gridcolor="rgba(255,255,255,.05)", title=None),
+                yaxis=dict(gridcolor="rgba(255,255,255,.05)",
+                           ticksuffix="%", title=None),
+                hoverlabel=dict(bgcolor="#111", font=dict(color="#e5e5e5")),
+            )
+            st.plotly_chart(fig_eq, width="stretch",
+                            config={"displayModeBar": False})
+            st.caption(
+                "Each point = one batch of calls (equal-weighted, 2-week hold, "
+                "graded at close). The gap between the lines IS the system's "
+                "edge — when green is below grey, following the calls "
+                "underperformed simply holding the market.")
+
         with st.expander("See the graded calls"):
             recent = rec.get("recent")
             if recent is not None and len(recent):
@@ -753,6 +801,35 @@ elif page == "🔍  Stock Detail":
         fig.update_yaxes(title_text="₹", row=1, col=1)
         fig.update_yaxes(title_text="RSI", row=2, col=1, range=[0, 100])
         st.plotly_chart(fig, width="stretch")
+
+        # ── this stock's call history: how did OUR past calls on it do? ──
+        import ai_data as _aid
+        _hist = _aid.swing_validated()
+        if len(_hist) and (sym_hist := _hist[_hist["symbol"] == sel]).shape[0] > 0:
+            wins = (sym_hist["realised_ret"] > 0).sum()
+            st.markdown(f"#### 📜 Our call history on {sel}")
+            st.caption(
+                f"{len(sym_hist)} graded swing call(s) · {wins} closed up · "
+                f"avg {sym_hist['realised_ret'].mean():+.2%} over the 2-week horizon")
+            hshow = sym_hist[["made_on", "signal", "entry", "target", "stop",
+                              "outcome", "exit_close", "realised_ret"]].copy()
+            hshow.columns = ["Date", "Signal", "Entry", "Target", "Stop",
+                             "Outcome", "Exit", "Return"]
+            hshow["Return"] = (hshow["Return"] * 100).round(2)
+
+            def _o(v):
+                return ("color:#22c55e;font-weight:700" if v == "TARGET"
+                        else "color:#ef4444;font-weight:600" if v == "STOP"
+                        else "color:#9ca3af")
+            def _r(v):
+                try: return f"color:{'#4ade80' if float(v) >= 0 else '#ef4444'}"
+                except (ValueError, TypeError): return ""
+            st.dataframe(
+                hshow.sort_values("Date", ascending=False).style
+                     .map(_o, subset=["Outcome"]).map(_r, subset=["Return"]),
+                width="stretch", hide_index=True,
+                height=min(320, 60 + 35 * len(hshow)),
+            )
 
 # ── Portfolio ─────────────────────────────────────────────────────────────────
 elif page == "💼  My Portfolio":

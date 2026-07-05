@@ -93,6 +93,20 @@ def swing_record() -> dict:
 
 
 @st.cache_data(ttl=900, show_spinner=False)
+def swing_validated() -> pd.DataFrame:
+    """All graded swing calls (full journal, not just the recent tail)."""
+    if not os.path.exists(SWING_JOURNAL):
+        return pd.DataFrame()
+    j = pd.read_csv(SWING_JOURNAL)
+    v = j[j["status"] == "validated"].copy()
+    if v.empty:
+        return v
+    for c in ("realised_ret", "market_ret"):
+        v[c] = v[c].astype(float)
+    return v
+
+
+@st.cache_data(ttl=900, show_spinner=False)
 def swing_learning() -> dict:
     """Learned per-tier / per-score-bucket stats from graded swing outcomes."""
     if not os.path.exists(SWING_JOURNAL):

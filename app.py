@@ -55,17 +55,20 @@ html, body, [data-testid="stAppViewContainer"], .stApp {
 }
 [data-testid="stSidebar"] > div:first-child { padding: 1.4rem 0.9rem !important; }
 
-/* nav items: quiet grey → green pill when active (fintech style) */
+/* nav items: full-width rows, fixed icon column, quiet grey → green when active */
 [data-testid="stSidebar"] .stRadio > label { display: none !important; }
-[data-testid="stSidebar"] .stRadio > div { gap: 2px !important; flex-direction: column !important; }
+[data-testid="stSidebar"] .stRadio > div { gap: 3px !important; flex-direction: column !important; }
 [data-testid="stSidebar"] .stRadio > div > label {
-    padding: 9px 12px !important;
-    border-radius: 8px !important;
+    display: flex !important;
+    align-items: center !important;
+    width: 100% !important;
+    padding: 10px 12px !important;
+    border-radius: 9px !important;
     color: #8a95a1 !important;
-    font-size: 13.5px !important;
+    font-size: 14px !important;
     cursor: pointer !important;
     transition: background .15s ease, color .15s ease !important;
-    margin: 1px 0 !important;
+    margin: 0 !important;
 }
 [data-testid="stSidebar"] .stRadio > div > label:hover {
     background: #171c22 !important;
@@ -77,7 +80,29 @@ html, body, [data-testid="stAppViewContainer"], .stApp {
     font-weight: 500 !important;
 }
 [data-testid="stSidebar"] .stRadio > div > label > div:first-child { display: none !important; }
-[data-testid="stSidebar"] hr { border-color: #1e242b !important; }
+/* label content fills the row; icon gets a fixed, aligned column */
+[data-testid="stSidebar"] .stRadio > div > label > div {
+    display: flex !important;
+    align-items: center !important;
+    width: 100% !important;
+}
+[data-testid="stSidebar"] .stRadio label [data-testid="stIconMaterial"],
+[data-testid="stSidebar"] .stRadio label span[class*="material-symbols"] {
+    font-size: 19px !important;
+    width: 30px !important;
+    flex-shrink: 0 !important;
+    color: inherit !important;
+}
+[data-testid="stSidebar"] .stRadio label p {
+    color: inherit !important;
+    font-size: 14px !important;
+    margin: 0 !important;
+    white-space: nowrap !important;
+}
+[data-testid="stSidebar"] hr {
+    border-color: #1e242b !important;
+    margin: 0.7rem 0 !important;
+}
 
 /* ── Metric cards: flat, borderless, calm ── */
 [data-testid="metric-container"] {
@@ -229,16 +254,16 @@ with st.sidebar:
 
     page = st.radio(
         "Navigation",
-        ["📊  Overview", "🎯  Swing Signals", "🤖  AI Lab — Defence",
-         "🧠  Feature Importance", "🔍  Stock Detail", "💼  My Portfolio"],
+        [":material/dashboard: Overview", ":material/track_changes: Swing Signals", ":material/smart_toy: AI Lab — Defence",
+         ":material/psychology: Feature Importance", ":material/candlestick_chart: Stock Detail", ":material/work: My Portfolio"],
         label_visibility="collapsed",
     )
 
     st.divider()
     st.markdown(f"""
-    <div style="font-size:11px;color:#5c6672;line-height:1.8;">
-      🕐 {datetime.now().strftime('%d %b %Y, %I:%M %p')}<br>
-      ⚡ Data refreshes hourly
+    <div style="padding:0 4px;font-size:11px;color:#5c6672;line-height:1.9;">
+      <div>{datetime.now().strftime('%d %b %Y, %I:%M %p')}</div>
+      <div>Data refreshes hourly</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -260,7 +285,7 @@ if closes.empty:
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Overview ──────────────────────────────────────────────────────────────────
-if page == "📊  Overview":
+if page == ":material/dashboard: Overview":
     st.markdown("## 📊 Market Overview")
     st.caption(f"Week-on-week performance across Nifty 500 — as of {closes.index[-1].strftime('%d %b %Y')}")
 
@@ -300,7 +325,7 @@ if page == "📊  Overview":
             )
 
 # ── Swing Signals ─────────────────────────────────────────────────────────────
-elif page == "🎯  Swing Signals":
+elif page == ":material/track_changes: Swing Signals":
     st.markdown("## 🎯 Swing Trade Signals")
     st.caption("RSI · MACD · 20DMA · 50DMA · Volume — 2-week swing horizon · Not financial advice")
 
@@ -515,7 +540,7 @@ elif page == "🎯  Swing Signals":
                f"'Why' = factor breakdown behind the score")
 
 # ── Stock Detail ──────────────────────────────────────────────────────────────
-elif page == "🔍  Stock Detail":
+elif page == ":material/candlestick_chart: Stock Detail":
     st.markdown("## 🔍 Stock Detail")
 
     syms = sorted(nifty500)
@@ -612,7 +637,7 @@ elif page == "🔍  Stock Detail":
             )
 
 # ── Portfolio ─────────────────────────────────────────────────────────────────
-elif page == "💼  My Portfolio":
+elif page == ":material/work: My Portfolio":
     st.markdown("## 💼 My Portfolio")
     st.caption("Enter holdings — one per line. P&L updates live against today's prices.")
 
@@ -676,7 +701,7 @@ elif page == "💼  My Portfolio":
             )
 
 # ── AI Lab — Defence ──────────────────────────────────────────────────────────
-elif page == "🤖  AI Lab — Defence":
+elif page == ":material/smart_toy: AI Lab — Defence":
     st.markdown("## 🤖 AI Lab — Defence Sector")
     st.caption("XGBoost next-day predictions that grade themselves every day and learn from the outcomes.")
 
@@ -794,7 +819,7 @@ It's a research aid, not a guarantee — out-of-sample edge is real but modest (
         st.plotly_chart(cfig, width="stretch")
 
 # ── Feature Importance ────────────────────────────────────────────────────────
-elif page == "🧠  Feature Importance":
+elif page == ":material/psychology: Feature Importance":
     st.markdown("## 🧠 Feature Importance")
     st.caption("What the model actually weighs when ranking defence stocks — global view across all predictions.")
 

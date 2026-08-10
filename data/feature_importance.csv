@@ -1,31 +1,31 @@
 feature,label,importance
-sector_ret_5d,sector 1-week,0.068185896
-dow,day of week,0.066745274
-sector_ret_1d,sector 1-day,0.053796735
-atr_pct,volatility (ATR),0.042044297
-dist_low_20,above 20-day low,0.04154452
-dist_sma10,vs 10-day avg,0.04014383
-bb_position,Bollinger position,0.038381692
-ret_std_10,10-day choppiness,0.03586085
-ret_3d,3-day momentum,0.03428794
-dist_high_20,below 20-day high,0.032586552
-sma20_slope,20-day trend slope,0.0319019
-rsi_14,RSI (14),0.03175158
-close_in_range,close strength,0.031372733
-ret_10d,2-week momentum,0.030489173
-vol_zscore,volume z-score,0.029595915
-macd_hist_slope,MACD momentum,0.029551283
-bb_width,Bollinger width,0.029155992
-ret_20d,1-month momentum,0.028875396
-hl_range_pct,daily range,0.028408507
-dist_sma50,vs 50-day avg,0.026375698
-ret_1d,1-day momentum,0.026245128
-dist_sma20,vs 20-day avg,0.026098285
-rsi_7,"RSI (7, fast)",0.025586296
-ret_5d,1-week momentum,0.02554491
-vol_ratio,volume surge,0.025264358
-ret_std_20,20-day choppiness,0.02455278
-rel_strength_5d,relative strength,0.024255618
-up_days_10,up-days in 10,0.024212351
-gap_pct,overnight gap,0.024160948
-macd_hist,MACD histogram,0.023023533
+dow,day of week,0.0698824
+sector_ret_5d,sector 1-week,0.06647344
+sector_ret_1d,sector 1-day,0.05921781
+dist_sma10,vs 10-day avg,0.049486797
+atr_pct,volatility (ATR),0.042475604
+bb_position,Bollinger position,0.03877628
+dist_low_20,above 20-day low,0.038459275
+hl_range_pct,daily range,0.035787802
+bb_width,Bollinger width,0.033171948
+ret_3d,3-day momentum,0.033130396
+close_in_range,close strength,0.032202855
+sma20_slope,20-day trend slope,0.030210514
+ret_10d,2-week momentum,0.030128025
+ret_5d,1-week momentum,0.028632281
+macd_hist_slope,MACD momentum,0.028535452
+rsi_7,"RSI (7, fast)",0.028351292
+ret_20d,1-month momentum,0.028175598
+ret_std_10,10-day choppiness,0.028115071
+vol_ratio,volume surge,0.027611198
+gap_pct,overnight gap,0.026859036
+dist_sma50,vs 50-day avg,0.026731163
+ret_1d,1-day momentum,0.026262792
+vol_zscore,volume z-score,0.026055356
+rel_strength_5d,relative strength,0.025905201
+rsi_14,RSI (14),0.025044113
+ret_std_20,20-day choppiness,0.02410856
+dist_high_20,below 20-day high,0.024048038
+up_days_10,up-days in 10,0.023745986
+dist_sma20,vs 20-day avg,0.021540714
+macd_hist,MACD histogram,0.020874979

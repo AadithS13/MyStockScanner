@@ -1,31 +1,31 @@
 feature,label,importance
-sector_ret_5d,sector 1-week,0.06653184
-dow,day of week,0.06345818
-sector_ret_1d,sector 1-day,0.057965796
-dist_sma10,vs 10-day avg,0.04482978
-dist_low_20,above 20-day low,0.04255365
-bb_position,Bollinger position,0.038749564
-dist_sma20,vs 20-day avg,0.03629581
-bb_width,Bollinger width,0.034386676
-ret_20d,1-month momentum,0.033559926
-ret_3d,3-day momentum,0.033052817
-atr_pct,volatility (ATR),0.03289816
-close_in_range,close strength,0.032516375
-sma20_slope,20-day trend slope,0.032172553
-macd_hist_slope,MACD momentum,0.03077701
-ret_10d,2-week momentum,0.029932726
-ret_5d,1-week momentum,0.028496714
-vol_ratio,volume surge,0.028004292
-rsi_7,"RSI (7, fast)",0.027992167
-gap_pct,overnight gap,0.027474934
-ret_std_20,20-day choppiness,0.027380688
-vol_zscore,volume z-score,0.027221033
-dist_sma50,vs 50-day avg,0.027043335
-hl_range_pct,daily range,0.026864646
-dist_high_20,below 20-day high,0.02585352
-ret_std_10,10-day choppiness,0.025643626
-rel_strength_5d,relative strength,0.025214963
-rsi_14,RSI (14),0.024838518
-ret_1d,1-day momentum,0.023297789
-macd_hist,MACD histogram,0.022986686
-up_days_10,up-days in 10,0.022006188
+sector_ret_5d,sector 1-week,0.061064843
+dow,day of week,0.060067054
+sector_ret_1d,sector 1-day,0.057961006
+dist_sma10,vs 10-day avg,0.04381809
+dist_low_20,above 20-day low,0.043266132
+bb_position,Bollinger position,0.040274438
+atr_pct,volatility (ATR),0.03886267
+dist_high_20,below 20-day high,0.034919348
+close_in_range,close strength,0.031993933
+rsi_7,"RSI (7, fast)",0.031976126
+macd_hist_slope,MACD momentum,0.031079357
+ret_3d,3-day momentum,0.030941952
+ret_10d,2-week momentum,0.030304747
+dist_sma50,vs 50-day avg,0.030303476
+ret_5d,1-week momentum,0.029724553
+ret_std_10,10-day choppiness,0.029429112
+sma20_slope,20-day trend slope,0.029395107
+gap_pct,overnight gap,0.02889877
+vol_ratio,volume surge,0.028647548
+ret_20d,1-month momentum,0.027849948
+rsi_14,RSI (14),0.027368471
+bb_width,Bollinger width,0.027020551
+hl_range_pct,daily range,0.026720202
+up_days_10,up-days in 10,0.026182525
+ret_1d,1-day momentum,0.025962742
+vol_zscore,volume z-score,0.02589393
+dist_sma20,vs 20-day avg,0.025806224
+ret_std_20,20-day choppiness,0.025413344
+rel_strength_5d,relative strength,0.025197878
+macd_hist,MACD histogram,0.023655817

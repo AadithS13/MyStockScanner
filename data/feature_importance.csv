@@ -1,31 +1,31 @@
 feature,label,importance
-sector_ret_5d,sector 1-week,0.058574844
-dow,day of week,0.057194192
-sector_ret_1d,sector 1-day,0.053013723
-dist_low_20,above 20-day low,0.049887203
-dist_sma10,vs 10-day avg,0.045825444
-macd_hist_slope,MACD momentum,0.042919483
-bb_position,Bollinger position,0.041096546
-atr_pct,volatility (ATR),0.03595076
-ret_20d,1-month momentum,0.03427863
-ret_10d,2-week momentum,0.03328934
-ret_3d,3-day momentum,0.03197858
-close_in_range,close strength,0.031587776
-ret_5d,1-week momentum,0.031144433
-ret_std_10,10-day choppiness,0.030901108
-dist_sma50,vs 50-day avg,0.03011208
-gap_pct,overnight gap,0.030107243
-rsi_14,RSI (14),0.02984811
-bb_width,Bollinger width,0.029302115
-sma20_slope,20-day trend slope,0.029289683
-hl_range_pct,daily range,0.028666638
-vol_zscore,volume z-score,0.027764164
-up_days_10,up-days in 10,0.027643843
-macd_hist,MACD histogram,0.027002737
-rsi_7,"RSI (7, fast)",0.026615784
-rel_strength_5d,relative strength,0.026332412
-ret_1d,1-day momentum,0.024647232
-dist_high_20,below 20-day high,0.02452089
-ret_std_20,20-day choppiness,0.023671912
-vol_ratio,volume surge,0.020387324
-dist_sma20,vs 20-day avg,0.01644577
+sector_ret_5d,sector 1-week,0.05949326
+dow,day of week,0.05313374
+sector_ret_1d,sector 1-day,0.052077264
+atr_pct,volatility (ATR),0.04317378
+dist_low_20,above 20-day low,0.04273083
+macd_hist_slope,MACD momentum,0.039778925
+bb_position,Bollinger position,0.036624983
+ret_3d,3-day momentum,0.03626056
+ret_20d,1-month momentum,0.03602836
+close_in_range,close strength,0.035064057
+dist_sma10,vs 10-day avg,0.034348976
+rsi_7,"RSI (7, fast)",0.03273864
+ret_10d,2-week momentum,0.032219574
+ret_1d,1-day momentum,0.031002685
+ret_5d,1-week momentum,0.030366022
+gap_pct,overnight gap,0.030284176
+ret_std_10,10-day choppiness,0.029527513
+rel_strength_5d,relative strength,0.029338483
+macd_hist,MACD histogram,0.029073864
+dist_sma50,vs 50-day avg,0.029008241
+rsi_14,RSI (14),0.028335892
+bb_width,Bollinger width,0.028062265
+up_days_10,up-days in 10,0.027892904
+ret_std_20,20-day choppiness,0.027277801
+vol_ratio,volume surge,0.026591172
+sma20_slope,20-day trend slope,0.025943277
+hl_range_pct,daily range,0.025765838
+vol_zscore,volume z-score,0.024107683
+dist_high_20,below 20-day high,0.021893607
+dist_sma20,vs 20-day avg,0.021855678

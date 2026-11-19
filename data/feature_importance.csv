@@ -1,31 +1,31 @@
 feature,label,importance
-sector_ret_5d,sector 1-week,0.057692755
-sector_ret_1d,sector 1-day,0.05555904
-dist_low_20,above 20-day low,0.053435214
-dow,day of week,0.049178835
-atr_pct,volatility (ATR),0.04511767
-bb_position,Bollinger position,0.037404835
-dist_sma10,vs 10-day avg,0.03675096
-ret_20d,1-month momentum,0.03555254
-close_in_range,close strength,0.03314383
-macd_hist_slope,MACD momentum,0.032829177
-sma20_slope,20-day trend slope,0.032712534
-ret_3d,3-day momentum,0.031127898
-vol_zscore,volume z-score,0.030456387
-ret_5d,1-week momentum,0.030351259
-rsi_14,RSI (14),0.030253844
-bb_width,Bollinger width,0.030032914
-macd_hist,MACD histogram,0.030027956
-ret_std_10,10-day choppiness,0.029642545
-ret_1d,1-day momentum,0.029360056
-dist_sma50,vs 50-day avg,0.029315665
-gap_pct,overnight gap,0.028923526
-hl_range_pct,daily range,0.028353287
-ret_10d,2-week momentum,0.027513418
-rel_strength_5d,relative strength,0.02749895
-dist_sma20,vs 20-day avg,0.027216088
-rsi_7,"RSI (7, fast)",0.026493369
-ret_std_20,20-day choppiness,0.026024394
-up_days_10,up-days in 10,0.02405942
-dist_high_20,below 20-day high,0.022211283
-vol_ratio,volume surge,0.0217604
+dow,day of week,0.058817774
+sector_ret_5d,sector 1-week,0.058103666
+sector_ret_1d,sector 1-day,0.054462813
+dist_low_20,above 20-day low,0.04403438
+dist_sma10,vs 10-day avg,0.041902445
+atr_pct,volatility (ATR),0.041573532
+ret_3d,3-day momentum,0.040300056
+close_in_range,close strength,0.033970248
+macd_hist_slope,MACD momentum,0.033928778
+bb_position,Bollinger position,0.033644762
+ret_20d,1-month momentum,0.03358646
+up_days_10,up-days in 10,0.032247167
+ret_10d,2-week momentum,0.03216339
+ret_std_10,10-day choppiness,0.031938408
+bb_width,Bollinger width,0.03124854
+dist_sma50,vs 50-day avg,0.029961536
+sma20_slope,20-day trend slope,0.029938484
+hl_range_pct,daily range,0.02929223
+ret_std_20,20-day choppiness,0.029208211
+macd_hist,MACD histogram,0.02916477
+dist_high_20,below 20-day high,0.02884295
+gap_pct,overnight gap,0.028711556
+rsi_7,"RSI (7, fast)",0.027993195
+rsi_14,RSI (14),0.0263748
+ret_1d,1-day momentum,0.02573498
+rel_strength_5d,relative strength,0.025370436
+vol_ratio,volume surge,0.024043795
+vol_zscore,volume z-score,0.023793252
+dist_sma20,vs 20-day avg,0.02012203
+ret_5d,1-week momentum,0.019525437
